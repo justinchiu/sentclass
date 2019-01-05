@@ -10,19 +10,11 @@ import os
 import json
 
 def make_fields():
-    ENT = Field(lower=True, include_lengths=True)
-    TYPE = Field(lower=True, include_lengths=True)
-    VALUE = Field(lower=True, include_lengths=True)
+    SENTIMENT = Field()
     TEXT = Field(
-        lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
-    return ENT, TYPE, VALUE, TEXT
-
-def build_vocab(a,b,c,d, data):
-    a.build_vocab(data)
-    b.build_vocab(data)
-    c.build_vocab(data)
-    d.build_vocab(data)
-
+        lower=True, include_lengths=True, is_target=True)
+        #lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
+    return TEXT, SENTIMENT
 
 def nested_items(name, x):
     if isinstance(x, dict):
@@ -32,82 +24,60 @@ def nested_items(name, x):
         yield (name, x)
 
 
-class RotoExample(Example):
+class SentihoodExample(Example):
     @classmethod
-    def fromJson(cls, data, ent_field, type_field, value_field, text_field):
+    def fromJson(cls, data, text_field, sentiment_field):
         exs = []
         for x in json.load(data):
             ex = cls()
 
-            entities = []
-            types = []
-            values = []
+            locations  = []
+            aspects    = []
+            sentiments = []
 
-            # Need to flatten all the tables into aligned lists of
-            # entities, types, and values.
-            # team stuff
-            home_name = x["home_name"]
-            vis_name = x["vis_name"]
+            for op in x["opinions"]:
+                location  = op["target_entity"]
+                aspect    = op["aspect"]
+                sentiment = op["sentiment"]
+                locations.append(location)
+                aspects.append(aspect)
+                sentiments.append(sentiment)
 
-            def add(entity, type, value):
-                entities.append(entity)
-                types.append(type)
-                values.append(value)
-
-            # flat team stats
-            add(home_name, "home_city", x["home_city"])
-            add(vis_name, "vis_city", x["vis_city"])
-            add("day", "day", x["day"])
-
-            # team lines
-            for k, v in x["home_line"].items():
-                add(home_name, k, v)
-            for k, v in x["vis_line"].items():
-                add(vis_name, k, v)
-
-            # flatten box_score: {key: {ID: value}}
-            box_score = x["box_score"]
-            id2name = box_score["PLAYER_NAME"]
-
-            for k, d in box_score.items():
-                for id, v in d.items():
-                    add(id2name[id], k, v)
-
-            # entities, types, values, summary
-            setattr(ex, "entities", ent_field.preprocess(entities))
-            setattr(ex, "types", type_field.preprocess(types))
-            setattr(ex, "values", value_field.preprocess(values))
-            setattr(ex, "text", text_field.preprocess(x["summary"]))
+            setattr(ex, "locations", text_field.preprocess(locations))
+            setattr(ex, "aspects", text_field.preprocess(aspects))
+            setattr(ex, "sentiments", sentiment_field.preprocess(sentiments))
+            setattr(ex, "text", text_field.preprocess(x["text"]))
 
             exs.append(ex)
         return exs
 
 
-class RotoDataset(Dataset):
+class SentihoodDataset(Dataset):
 
     @staticmethod
-    def make_fields(entity_field, type_field, value_field, text_field):
+    def make_fields(text_field, sentiment_field):
         return [
-            ("entities", entity_field),
-            ("types", type_field),
-            ("values", value_field),
+            ("locations", text_field),
+            ("aspects", text_field),
+            ("sentiments", sentiment_field),
             ("text", text_field),
         ]
 
 
     def __init__(
         self, path,
-        entity_field, type_field, value_field, text_field,
+        text_field,
+        sentiment_field,
         **kwargs
     ):
 
         # Sort by length of the text
         self.sort_key = lambda x: len(x.text)
 
-        fields = self.make_fields(entity_field, type_field, value_field, text_field)
+        fields = self.make_fields(text_field, sentiment_field)
 
         with io.open(os.path.expanduser(path), encoding="utf8") as f:
-            examples = RotoExample.fromJson(f, entity_field, type_field, value_field, text_field)
+            examples = SentihoodExample.fromJson(f, text_field, sentiment_field)
 
         # unused
         if isinstance(fields, dict):
@@ -118,28 +88,27 @@ class RotoDataset(Dataset):
                 else:
                     fields.append(field)
 
-        super(RotoDataset, self).__init__(examples, fields, **kwargs)
+        super(SentihoodDataset, self).__init__(examples, fields, **kwargs)
 
 
     @classmethod
     def splits(
         cls,
-        entity_field, type_field, value_field, text_field,
+        text_field,
+        sentiment_field,
         path = None,
         root='.data',
-        train='train.json', validation='valid.json', test='test.json',
+        train='sentihood-train.json', validation='sentihood-dev.json', test='sentihood-test.json',
         **kwargs
     ):
-        return super(RotoDataset, cls).splits(
+        return super(SentihoodDataset, cls).splits(
             path = path,
             root = root,
             train = train,
             validation = validation,
             test = test,
-            entity_field = entity_field,
-            type_field = type_field,
-            value_field = value_field,
             text_field = text_field,
+            sentiment_field = sentiment_field,
             **kwargs
         )
 
@@ -156,20 +125,14 @@ class RotoDataset(Dataset):
 
 
 if __name__ == "__main__":
-    filepath = "/n/rush_lab/jc/code/data2text/boxscore-data/rotowire/"
-    ENT = Field(lower=True, include_lengths=True)
-    TYPE = Field(lower=True, include_lengths=True)
-    VALUE = Field(lower=True, include_lengths=True)
-    TEXT = Field(lower=True, include_lengths=True)
-    ENT, TYPE, VALUE, TEXT = make_fields()
+    filepath = "/n/rush_lab/jc/code/sentclass/data"
+    TEXT, SENTIMENT = make_fields()
 
-    train, valid, test = RotoDataset.splits(
-        ENT, TYPE, VALUE, TEXT, path=filepath
+    train, valid, test = SentihoodDataset.splits(
+        TEXT, SENTIMENT, path=filepath
     )
-    ENT.build_vocab(train)
-    TYPE.build_vocab(train)
-    VALUE.build_vocab(train)
     TEXT.build_vocab(train)
+    SENTIMENT.build_vocab(train)
 
     train_iter, valid_iter, test_iter = data.BucketIterator.splits(
         (train, valid, test), batch_size=32, device=torch.device("cuda:0")
