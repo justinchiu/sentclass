@@ -9,12 +9,66 @@ import io
 import os
 import json
 
+LOCATIONS = ["location1", "location2"]
+ASPECTS = [
+    "price",
+    "safety",
+    "transit-location",
+    "general",
+]
+ALL_ASPECTS = [
+    "price",
+    "safety",
+    "transit-location",
+    "general",
+    "live",
+    "quiet",
+    "dining",
+    "nightlife",
+    "touristy",
+    "shopping",
+    "green-culture",
+    "multicultural",
+    "misc",
+]
+
+def la2idx(self):
+    return {
+        (l, a): i * len(LOCATIONS) + j
+        for i, l in enumerate(LOCATIONS)
+        #for j, a in enumerate(ASPECTS)
+        for j, a in enumerate(ALL_ASPECTS)
+    }
+
+def unzip(xs):
+    return zip(*xs)
+
+# opnions: [{"sentiment": , "aspect": , "location": }]
+def get_opinions(opinions):
+    labels = {
+        (op["target_entity"].lower(), op["aspect"].lower()): op["sentiment"].lower()
+        for op in opinions
+    }
+    return list(unzip(
+        (
+            l,
+            a,
+            "none" if (l, a) not in labels else labels[(l,a)],
+        )
+        #for l in LOCATIONS for a in ASPECTS
+        for l in LOCATIONS for a in ALL_ASPECTS
+    ))
+
 def make_fields():
-    SENTIMENT = Field()
+    SENTIMENT = Field(lower=True, is_target=True)
     TEXT = Field(
         lower=True, include_lengths=True, is_target=True)
         #lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
     return TEXT, SENTIMENT
+
+def build_vocab(f1, f2, d):
+    f1.build_vocab(d)
+    f2.build_vocab(d)
 
 def nested_items(name, x):
     if isinstance(x, dict):
@@ -25,27 +79,18 @@ def nested_items(name, x):
 
 
 class SentihoodExample(Example):
+
     @classmethod
     def fromJson(cls, data, text_field, sentiment_field):
         exs = []
         for x in json.load(data):
             ex = cls()
 
-            locations  = []
-            aspects    = []
-            sentiments = []
+            locations, aspects, sentiments = get_opinions(x["opinions"])
 
-            for op in x["opinions"]:
-                location  = op["target_entity"]
-                aspect    = op["aspect"]
-                sentiment = op["sentiment"]
-                locations.append(location)
-                aspects.append(aspect)
-                sentiments.append(sentiment)
-
-            setattr(ex, "locations", text_field.preprocess(locations))
-            setattr(ex, "aspects", text_field.preprocess(aspects))
-            setattr(ex, "sentiments", sentiment_field.preprocess(sentiments))
+            setattr(ex, "locations", text_field.preprocess(list(locations)))
+            setattr(ex, "aspects", text_field.preprocess(list(aspects)))
+            setattr(ex, "sentiments", sentiment_field.preprocess(list(sentiments)))
             setattr(ex, "text", text_field.preprocess(x["text"]))
 
             exs.append(ex)
