@@ -39,7 +39,8 @@ class Sent(nn.Module):
                 logits = self(x, lens, k)
 
                 nll = self.loss(logits, y)
-                import pdb; pdb.set_trace()
+                nelbo = nll
+                N = y.shape[0]
                 if learn:
                     nelbo.div(N).backward()
                     if clip > 0:
@@ -48,9 +49,9 @@ class Sent(nn.Module):
                             #gnorm = clip_(param, clip)
                     optimizer.step()
                 cum_loss += nelbo.item()
-                cum_ntokens += nwords.item()
+                cum_ntokens += N
                 batch_loss += nelbo.item()
-                batch_ntokens += nwords.item()
+                batch_ntokens += N
                 if re is not None and i % re == -1 % re:
                     titer.set_postfix(loss = batch_loss / batch_ntokens, gnorm = gnorm)
                     batch_loss = 0
