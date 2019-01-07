@@ -8,8 +8,8 @@ import torch.optim as optim
 
 from torchtext.data import BucketIterator
 
-import sentihood as data
-from models.boring import Boring
+import sentclass.sentihood as data
+from sentclass.models.boring import Boring
 
 import json
 
@@ -61,6 +61,8 @@ def get_args():
     parser.add_argument("--emb-sz", default=256, type=int)
     parser.add_argument("--rnn-sz", default=256, type=int)
 
+    parser.add_argument("--tieweights", action="store_true", default=False)
+
     parser.add_argument("--save", action="store_true")
 
     parser.add_argument("--re", default=100, type=int)
@@ -79,7 +81,7 @@ device = torch.device(f"cuda:{args.devid}" if args.devid >= 0 else "cpu")
 
 # Data
 TEXT, SENTIMENT = data.make_fields()
-train, valid, test = data.RotoDataset.splits(
+train, valid, test = data.SentihoodDataset.splits(
     TEXT, SENTIMENT, path=args.filepath)
 
 data.build_vocab(TEXT, SENTIMENT, train)
@@ -97,10 +99,11 @@ train_iter, valid_iter, test_iter = BucketIterator.splits(
 if args.model == "boring":
     model = Boring(
         V       = TEXT.vocab,
+        Y_shape = data.Y_shape,
         emb_sz  = args.emb_sz,
         rnn_sz  = args.rnn_sz,
         nlayers = args.nlayers,
-        dropout = args.dp,
+        dp      = args.dp,
         tieweights = args.tieweights,
     )
 elif args.model == "crf":

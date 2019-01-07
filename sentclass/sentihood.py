@@ -9,7 +9,10 @@ import io
 import os
 import json
 
-LOCATIONS = ["location1", "location2"]
+LOCATIONS = [
+    "location1",
+    "location2",
+]
 ASPECTS = [
     "price",
     "safety",
@@ -31,6 +34,14 @@ ALL_ASPECTS = [
     "multicultural",
     "misc",
 ]
+SENTIMENTS = [
+    "positive",
+    "negative",
+    "none",
+]
+
+Y_shape = torch.Size([len(LOCATIONS), len(ALL_ASPECTS), len(SENTIMENTS)])
+#return [len(LOCATIONS), len(ASPECTS), len(SENTIMENTS)]
 
 def la2idx(self):
     return {
@@ -39,6 +50,7 @@ def la2idx(self):
         #for j, a in enumerate(ASPECTS)
         for j, a in enumerate(ALL_ASPECTS)
     }
+
 
 def unzip(xs):
     return zip(*xs)
@@ -60,22 +72,15 @@ def get_opinions(opinions):
     ))
 
 def make_fields():
-    SENTIMENT = Field(lower=True, is_target=True)
+    SENTIMENT = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
     TEXT = Field(
-        lower=True, include_lengths=True, is_target=True)
+        lower=True, include_lengths=True, is_target=True, batch_first=True)
         #lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
     return TEXT, SENTIMENT
 
 def build_vocab(f1, f2, d):
     f1.build_vocab(d)
     f2.build_vocab(d)
-
-def nested_items(name, x):
-    if isinstance(x, dict):
-        for k, v in x.items():
-            yield from nested_items(f"{name}_{k}", v)
-    else:
-        yield (name, x)
 
 
 class SentihoodExample(Example):
