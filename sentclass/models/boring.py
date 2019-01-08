@@ -10,6 +10,8 @@ class Boring(Sent):
     def __init__(
         self,
         V = None,
+        L = None,
+        A = None,
         Y_shape = None,
         emb_sz = 256,
         rnn_sz = 256,
@@ -24,6 +26,9 @@ class Boring(Sent):
         self._N = 0
 
         self.V = V
+        self.L = L
+        self.A = A
+
         self.Y_shape = Y_shape
         self.emb_sz = emb_sz
         self.rnn_sz = rnn_sz
@@ -35,54 +40,77 @@ class Boring(Sent):
             embedding_dim = emb_sz,
             padding_idx = V.stoi[self.PAD],
         )
+        self.lut.weight.data.copy_(V.vectors)
+        self.lut.weight.requires_grad = False
         self.rnn = nn.LSTM(
             input_size = emb_sz,
             hidden_size = rnn_sz,
             num_layers = nlayers,
             bias = False,
-            dropout = dp,
+            dropout = 0,#dp,
             bidirectional = True,
             batch_first   = True,
         )
         self.drop = nn.Dropout(dp)
 
         # Score each sentiment for each location and aspect
+        # Store the combined pos, neg, none in a single vector :(
+        self.proj = nn.Embedding(
+            num_embeddings = Y_shape[0] * Y_shape[1],
+            embedding_dim = 2*rnn_sz*3
+        )
+        """
         self.proj = nn.Linear(
             in_features = 2*rnn_sz,
-            out_features = Y_shape[0] * Y_shape[1] * Y_shape[2],
+            out_features = Y_shape[-1],
             bias = False,
         )
+        """
 
         # Tie weights???
         #if tieweights:
             #self.proj.weight = self.lut.weight
 
-
-    def forward(self, x, lens, k):
-        emb = self.lut(x)
+    def forward(self, x, lens, k, kx):
+        emb = self.drop(self.lut(x))
         p_emb = pack(emb, lens, True)
         x, (h, c) = self.rnn(p_emb)
         # h: L * D x N x H
         x = unpack(x, True)[0]
         # y: N x D * H
+        #h = h+c
+        # Get the last hidden states for both directions
+        h = (h
+            .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
+            .permute(1, 0, 2)
+            .contiguous()
+            .view(-1, 2 * self.rnn_sz))
+        l, a = k
+        # factor this out, for sure.
+        y_idx = l * self.Y_shape[0] + a
+        z = self.proj(y_idx.squeeze())
+        # need to split into 3
+        import pdb; pdb.set_trace()
+        Ys = self.Y_shape
+        return y
+
+    def _old_forward(self, x, lens, k):
+        emb = self.drop(self.lut(x))
+        p_emb = pack(emb, lens, True)
+        x, (h, c) = self.rnn(p_emb)
+        # h: L * D x N x H
+        x = unpack(x, True)[0]
+        # y: N x D * H
+        #h = h+c
         y = (h
             .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
             .permute(1, 0, 2)
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
         Ys = self.Y_shape
-        return self.proj(self.drop(y)).view(-1, Ys[0], Ys[1], Ys[2])
+        #return self.proj(self.drop(y)).view(-1, Ys[0], Ys[1], Ys[2])
+        return self.proj(y).view(-1, Ys[0], Ys[1], Ys[2])
         #return self.proj(self.drop(unpack(x)[0])), s
-
-
-    def init_state(self, N):
-        if self._N != N:
-            self._N = N
-            self._state = (
-                torch.zeros(self.nlayers, N, self.rnn_sz).to(self.lut.weight.device),
-                torch.zeros(self.nlayers, N, self.rnn_sz).to(self.lut.weight.device),
-            )
-        return self._state
 
 if __name__ == "__main__":
     print("HI")

@@ -7,8 +7,10 @@ import torch
 import torch.optim as optim
 
 from torchtext.data import BucketIterator
+from torchtext.vocab import GloVe
 
 import sentclass.sentihood as data
+from sentclass.sentihood import RandomIterator
 from sentclass.models.boring import Boring
 
 import json
@@ -26,6 +28,8 @@ def get_args():
     )
 
     parser.add_argument("--devid", default=-1, type=int)
+
+    parser.add_argument("--flat-data", action="store_true", default=False)
 
     parser.add_argument("--bsz", default=32, type=int)
     parser.add_argument("--epochs", default=32, type=int)
@@ -58,8 +62,8 @@ def get_args():
     )
 
     parser.add_argument("--nlayers", default=2, type=int)
-    parser.add_argument("--emb-sz", default=256, type=int)
-    parser.add_argument("--rnn-sz", default=256, type=int)
+    parser.add_argument("--emb-sz", default=300, type=int)
+    parser.add_argument("--rnn-sz", default=50, type=int)
 
     parser.add_argument("--tieweights", action="store_true", default=False)
 
@@ -80,13 +84,20 @@ torch.cuda.manual_seed(args.seed)
 device = torch.device(f"cuda:{args.devid}" if args.devid >= 0 else "cpu")
 
 # Data
-TEXT, SENTIMENT = data.make_fields()
+TEXT, LOCATION, ASPECT, SENTIMENT = data.make_fields()
 train, valid, test = data.SentihoodDataset.splits(
-    TEXT, SENTIMENT, path=args.filepath)
+    TEXT, LOCATION, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath)
 
-data.build_vocab(TEXT, SENTIMENT, train)
+data.build_vocab(TEXT, LOCATION, ASPECT, SENTIMENT, train)
+TEXT.vocab.load_vectors(vectors=GloVe(name="42B"))
+TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
+    (TEXT.vocab.vectors[TEXT.vocab.stoi["transit"]] +
+        TEXT.vocab.vectors[TEXT.vocab.stoi["location"]]) / 2
+)
 
-train_iter, valid_iter, test_iter = BucketIterator.splits(
+iterator = BucketIterator if not args.flat_data else RandomIterator
+
+train_iter, valid_iter, test_iter = iterator.splits(
     (train, valid, test),
     batch_size = args.bsz,
     device = device,
@@ -99,6 +110,8 @@ train_iter, valid_iter, test_iter = BucketIterator.splits(
 if args.model == "boring":
     model = Boring(
         V       = TEXT.vocab,
+        L       = LOCATION.vocab,
+        A       = ASPECT.vocab,
         Y_shape = data.Y_shape,
         emb_sz  = args.emb_sz,
         rnn_sz  = args.rnn_sz,
@@ -146,10 +159,19 @@ for e in range(args.epochs):
 
     # Validate
     valid_loss, ntok = model.validate(valid_iter)
-    print(f"Epoch {e} train loss: {train_loss / tntok} valid loss: {valid_loss / ntok}")
     schedule.step(valid_loss / ntok)
 
     if args.save and valid_loss < best_val:
         best_val = valid_loss
         savestring = f"{args.model}-lr{args.lr}-dp{args.dp}-tw{args.tieweights}-if{args.inputfeed}.pt"
         torch.save(model, savestring)
+
+    # Accuracy on train
+    train_acc = model.acc(train_iter)
+    # Accuracy on Valid
+    valid_acc = model.acc(valid_iter)
+
+    # Report
+    print(f"Epoch {e}")
+    print(f"train loss: {train_loss / tntok} train acc: {train_acc}")
+    print(f"valid loss: {valid_loss / ntok} valid acc: {valid_acc}")

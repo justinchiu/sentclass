@@ -28,15 +28,18 @@ class Sent(nn.Module):
                     optimizer.zero_grad()
                 x, lens = batch.text
 
-                l, lene = batch.locations
-                a, lent = batch.aspects
+                lx, _ = batch.locations_text
+                ax, _ = batch.aspects_text
+                l = batch.locations
+                a = batch.aspects
                 y = batch.sentiments
 
                 # keys 
                 k = [l, a]
+                kx = []
 
-                # N x l x a x y
-                logits = self(x, lens, k)
+                # N x l x a x y, now N x y for dealing w imbalance
+                logits = self(x, lens, k, kx)
 
                 nll = self.loss(logits, y)
                 nelbo = nll
@@ -80,6 +83,36 @@ class Sent(nn.Module):
             .view(-1, logits.shape[-1])
             .gather(-1, yflat)#[yflat != 1]
             .sum())
+
+    def acc(self, iter):
+        correct = 0.
+        total = 0.
+        with torch.no_grad():
+            for i, batch in enumerate(iter):
+                x, lens = batch.text
+
+                l, lene = batch.locations
+                a, lent = batch.aspects
+                y = batch.sentiments
+                N = y.shape[0]
+                # Aspects: 7, 8, 12, 16, or first 4
+
+                # keys 
+                k = [l, a]
+
+                # N x l x a x y
+                logits = self(x, lens, k)
+                _, hy = logits.view(N, -1, 3).max(-1)
+                #y = y.view(N, 2, -1)
+                #import pdb; pdb.set_trace()
+
+                #hy = hy[:,:,:4]
+                #y = y[:,:,:4]
+                #correct += (hy == y).sum().item()
+                #total += y.nelement()
+                correct += (hy[y != 0] == y[y!=0]).sum().item()
+                total += y[y!=0].nelement()
+        return correct / total
 
 
 class Crf(Sent):
