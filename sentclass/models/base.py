@@ -124,6 +124,63 @@ class Sent(nn.Module):
         #print(f"acc total: {ftotal}")
         return correct / total
 
+    def f1(self, iter):
+        """ Compute aspect F1
+            Only checks if aspects are nonzero.
+            Cannot take in a flattened iterator.
+        """
+        p = 0.
+        r = 0.
+        Nf = 0
+        with torch.no_grad():
+            for i, batch in enumerate(iter):
+                x, lens = batch.text
+
+                l = batch.locations
+                a = batch.aspects
+                lx, _ = batch.locations_text
+                ax, _ = batch.aspects_text
+                y = batch.sentiments
+                N = y.shape[0]
+                # Aspects: 7, 8, 12, 16, or first 4
+
+                hys = []
+                for j in range(l.shape[-1]):
+                    # keys 
+                    k = [l[:,j], a[:,j]]
+                    kx = [lx[:,j], ax[:,j]]
+
+                    # N x l x a x y
+                    logits = self(x, lens, k, kx)
+                    _, hy = logits.view(N, -1, 3).max(-1)
+                    hys.append(hy)
+                hy = torch.cat(hys, dim=-1)
+
+                # reshape into targets
+                hy = hy.view(N*2, len(self.A)).ne(0)
+                y = y.view(N*2, len(self.A)).ne(0)
+
+                mask = y.sum(-1).ne(0)
+                hy = hy[mask]
+                y = y[mask]
+
+                pi = (hy * y).sum(-1).float() / hy.sum(-1).float()
+                ri = (hy * y).sum(-1).float() / y.sum(-1).float()
+                Ni = y.shape[0]
+                pi[pi != pi] = 0
+                if (pi != pi).any():
+                    import pdb; pdb.set_trace()
+                if (ri != ri).any():
+                    import pdb; pdb.set_trace()
+
+                p += pi.sum().item()
+                r += ri.sum().item()
+                Nf += Ni
+        P = p / Nf
+        R = r / Nf
+        F1 = 2 * P * R / (P + R)
+        return F1
+
 
 class Crf(Sent):
     def _loop(self, iter, optimizer=None, clip=0, learn=False, re=None):

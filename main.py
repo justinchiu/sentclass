@@ -95,7 +95,11 @@ TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
         TEXT.vocab.vectors[TEXT.vocab.stoi["location"]]) / 2
 )
 
+asp_train, asp_valid, asp_test = data.SentihoodDataset.splits(
+    TEXT, LOCATION, ASPECT, SENTIMENT, flat=False, path=args.filepath)
+
 iterator = BucketIterator if not args.flat_data else RandomIterator
+asp_iterator = BucketIterator
 
 train_iter, valid_iter, test_iter = iterator.splits(
     (train, valid, test),
@@ -113,10 +117,18 @@ full_train_iter = RandomIterator(
     sort_within_batch = True,
     train = False,
 )
+asp_train_iter, asp_valid_iter, asp_test_iter = asp_iterator.splits(
+    (asp_train, asp_valid, asp_test),
+    batch_size = args.bsz,
+    device = device,
+    repeat = False,
+    sort_within_batch = True,
+)
 #import pdb; pdb.set_trace()
 
 # Model
 if args.model == "boring":
+    assert(args.flat_data)
     model = Boring(
         V       = TEXT.vocab,
         L       = LOCATION.vocab,
@@ -153,8 +165,6 @@ optimizer = optim.Adam(
     params, lr = args.lr, weight_decay = args.wd, betas=(args.b1, args.b2))
 schedule = optim.lr_scheduler.ReduceLROnPlateau(
     optimizer, patience=args.pat, factor=args.lrd, threshold=1e-3)
-#batch = next(iter(train_iter))
-# TODO: try truncating sequences early on?
 
 best_val = float("inf")
 for e in range(args.epochs):
@@ -171,19 +181,22 @@ for e in range(args.epochs):
 
     # Validate
     valid_loss, ntok = model.validate(valid_iter)
+    # No schedule...dataset too small and gradients too noisy
     #schedule.step(valid_loss / ntok)
-
-    if args.save and valid_loss < best_val:
-        best_val = valid_loss
-        savestring = f"{args.model}-lr{args.lr}-dp{args.dp}-tw{args.tieweights}-if{args.inputfeed}.pt"
-        torch.save(model, savestring)
 
     # Accuracy on train
     train_acc = model.acc(full_train_iter)
     # Accuracy on Valid
     valid_acc = model.acc(valid_iter)
 
+    valid_f1 = model.f1(asp_valid_iter)
+
     # Report
     print(f"Epoch {e}")
     print(f"train loss: {train_loss / tntok} train acc: {train_acc}")
-    print(f"valid loss: {valid_loss / ntok} valid acc: {valid_acc}")
+    print(f"valid loss: {valid_loss / ntok} valid acc: {valid_acc} valid f1: {valid_f1}")
+
+    if args.save and valid_loss < best_val:
+        best_val = valid_loss
+        savestring = f"{args.model}-lr{args.lr}-dp{args.dp}-tw{args.tieweights}-if{args.inputfeed}.pt"
+        torch.save(model, savestring)

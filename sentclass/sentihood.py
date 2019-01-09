@@ -63,6 +63,21 @@ def get_opinions(opinions, text):
         #for l in LOCATIONS for a in ALL_ASPECTS
     ))
 
+def get_all_opinions(opinions, text=None):
+    labels = {
+        (op["target_entity"].lower(), op["aspect"].lower()): op["sentiment"].lower()
+        for op in opinions
+    }
+    return list(unzip(
+        (
+            l,
+            a,
+            "none" if (l, a) not in labels else labels[(l,a)],
+        )
+        for l in LOCATIONS for a in ASPECTS
+        #for l in LOCATIONS for a in ALL_ASPECTS
+    ))
+
 def make_fields():
     SENTIMENT = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
     LOCATION = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
@@ -89,7 +104,7 @@ class SentihoodExample(Example):
             ex = cls()
 
             # hmmmm get_opinions filters
-            locations, aspects, sentiments = get_opinions(x["opinions"], x["text"])
+            locations, aspects, sentiments = get_all_opinions(x["opinions"], x["text"])
             setattr(ex, "locations", location_field.preprocess(list(locations)))
             setattr(ex, "aspects", aspect_field.preprocess(list(aspects)))
             setattr(ex, "locations_text", text_field.preprocess(list(locations)))
