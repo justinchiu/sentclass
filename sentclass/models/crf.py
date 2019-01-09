@@ -1,4 +1,4 @@
-from .base import Sent
+from .ugm import Ugm
 from .. import sentihood as data
 
 import torch
@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
-class Boring(Sent):
+class Crf(Ugm):
     def __init__(
         self,
         V = None,
@@ -43,7 +43,7 @@ class Boring(Sent):
             padding_idx = V.stoi[self.PAD],
         )
         self.lut.weight.data.copy_(V.vectors)
-        #self.lut.weight.requires_grad = False
+        self.lut.weight.requires_grad = False
         self.lut_la = nn.Embedding(
             num_embeddings = len(L) * len(A),
             embedding_dim = nlayers * 2 * 2 * rnn_sz,
@@ -79,7 +79,6 @@ class Boring(Sent):
         N = l.shape[0]
         # factor this out, for sure. POSSIBLE BUGS
         y_idx = l * len(self.A) + a
-        import pdb; pdb.set_trace()
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
             .permute(1, 2, 0, 3)
@@ -87,9 +86,7 @@ class Boring(Sent):
         state = (s[0], s[1])
         x, (h, c) = self.rnn(p_emb, state)
         # h: L * D x N x H
-        x = unpack(x, True)[0]
-        # y: N x D * H
-        #h = h+c
+        #x = unpack(x, True)[0]
         # Get the last hidden states for both directions, POSSIBLE BUGS
         h = (h
             .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
@@ -97,6 +94,7 @@ class Boring(Sent):
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
         return self.proj(h)
+        # when there was a different sentiment rep for each l, a
         #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
         #Ys = self.Y_shape
         #return torch.einsum("nyh,nh->ny", [z, h])
@@ -115,6 +113,4 @@ class Boring(Sent):
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
         Ys = self.Y_shape
-        #return self.proj(self.drop(y)).view(-1, Ys[0], Ys[1], Ys[2])
         return self.proj(y).view(-1, Ys[0], Ys[1], Ys[2])
-        #return self.proj(self.drop(unpack(x)[0])), s

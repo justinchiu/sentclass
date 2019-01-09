@@ -1,5 +1,4 @@
-# rnnlm main.py --devid 0 --tieweights => 2.7
-# crnnlm main.py --devid 0 --model crnnlm --tieweights --lr 0.003 => 2.337
+# python main.py --devid 1 --bsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --flat-data --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000
  
 import argparse
 
@@ -12,6 +11,7 @@ from torchtext.vocab import GloVe
 import sentclass.sentihood as data
 from sentclass.sentihood import RandomIterator
 from sentclass.models.boring import Boring
+from sentclass.models.crf import Crf
 
 import json
 
@@ -143,17 +143,14 @@ if args.model == "boring":
     )
 elif args.model == "crf":
     model = Crf(
-        Ve = ENT.vocab,
-        Vt = TYPE.vocab,
-        Vv = VALUE.vocab,
-        Vx = TEXT.vocab,
-        r_emb_sz = args.emb_sz,
-        x_emb_sz = args.emb_sz,
-        rnn_sz = args.rnn_sz,
+        V       = TEXT.vocab,
+        L       = LOCATION.vocab,
+        A       = ASPECT.vocab,
+        S       = SENTIMENT.vocab,
+        emb_sz  = args.emb_sz,
+        rnn_sz  = args.rnn_sz,
         nlayers = args.nlayers,
-        dropout = args.dp,
-        tieweights = args.tieweights,
-        inputfeed = args.inputfeed,
+        dp      = args.dp,
     )
 
 model.to(device)
