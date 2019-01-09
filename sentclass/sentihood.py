@@ -43,10 +43,14 @@ def unzip(xs):
     return zip(*xs)
 
 # opnions: [{"sentiment": , "aspect": , "location": }]
-def get_opinions(opinions):
+def get_opinions(opinions, text):
     labels = {
         (op["target_entity"].lower(), op["aspect"].lower()): op["sentiment"].lower()
         for op in opinions
+    }
+    locs = {
+        l: any(l == x.lower() for x in text.split())
+        for l in LOCATIONS
     }
     return list(unzip(
         (
@@ -55,6 +59,7 @@ def get_opinions(opinions):
             "none" if (l, a) not in labels else labels[(l,a)],
         )
         for l in LOCATIONS for a in ASPECTS
+        if locs[l]
         #for l in LOCATIONS for a in ALL_ASPECTS
     ))
 
@@ -83,7 +88,8 @@ class SentihoodExample(Example):
         for x in json.load(data):
             ex = cls()
 
-            locations, aspects, sentiments = get_opinions(x["opinions"])
+            # hmmmm get_opinions filters
+            locations, aspects, sentiments = get_opinions(x["opinions"], x["text"])
             setattr(ex, "locations", location_field.preprocess(list(locations)))
             setattr(ex, "aspects", aspect_field.preprocess(list(aspects)))
             setattr(ex, "locations_text", text_field.preprocess(list(locations)))
@@ -109,7 +115,10 @@ class SentihoodFlatExample(Example):
         tot = 0
 
         for x in json.load(data):
-            for l, a, s in zip(*get_opinions(x["opinions"])):
+            #print(list(zip(*get_opinions(x["opinions"], x["text"]))))
+            #print(x["text"])
+            #import pdb; pdb.set_trace()
+            for l, a, s in zip(*get_opinions(x["opinions"], x["text"])):
                 ex = cls()
 
                 setattr(ex, "locations", location_field.preprocess(l))

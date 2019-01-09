@@ -105,6 +105,15 @@ train_iter, valid_iter, test_iter = iterator.splits(
     sort_within_batch = True,
     #sort_key = already given in dataset?
 )
+full_train_iter = RandomIterator(
+    dataset = train,
+    batch_size = args.bsz,
+    device = device,
+    repeat = False,
+    sort_within_batch = True,
+    train = False,
+)
+#import pdb; pdb.set_trace()
 
 # Model
 if args.model == "boring":
@@ -112,6 +121,7 @@ if args.model == "boring":
         V       = TEXT.vocab,
         L       = LOCATION.vocab,
         A       = ASPECT.vocab,
+        S       = SENTIMENT.vocab,
         Y_shape = data.Y_shape,
         emb_sz  = args.emb_sz,
         rnn_sz  = args.rnn_sz,
@@ -149,9 +159,11 @@ schedule = optim.lr_scheduler.ReduceLROnPlateau(
 best_val = float("inf")
 for e in range(args.epochs):
     print(f"Epoch {e} lr {optimizer.param_groups[0]['lr']}")
+    train_iter.init_epoch()
+    #print(" ".join([TEXT.vocab.itos[x] for x in next(iter(train_iter)).text[0][0].tolist()]))
     # Train
     train_loss, tntok = model.train_epoch(
-        iter      = train_iter,
+        diter     = train_iter,
         clip      = args.clip,
         re        = args.re,
         optimizer = optimizer,
@@ -159,7 +171,7 @@ for e in range(args.epochs):
 
     # Validate
     valid_loss, ntok = model.validate(valid_iter)
-    schedule.step(valid_loss / ntok)
+    #schedule.step(valid_loss / ntok)
 
     if args.save and valid_loss < best_val:
         best_val = valid_loss
@@ -167,7 +179,7 @@ for e in range(args.epochs):
         torch.save(model, savestring)
 
     # Accuracy on train
-    train_acc = model.acc(train_iter)
+    train_acc = model.acc(full_train_iter)
     # Accuracy on Valid
     valid_acc = model.acc(valid_iter)
 

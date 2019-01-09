@@ -12,7 +12,7 @@ from torch.nn.utils import clip_grad_norm_ as clip_
 class Sent(nn.Module):
     PAD = "<pad>"
 
-    def _loop(self, iter, optimizer=None, clip=0, learn=False, re=None):
+    def _loop(self, diter, optimizer=None, clip=0, learn=False, re=None):
         context = torch.enable_grad if learn else torch.no_grad
 
         cum_loss = 0
@@ -22,8 +22,9 @@ class Sent(nn.Module):
         batch_loss = 0
         batch_ntokens = 0
         with context():
-            titer = tqdm(iter) if learn else iter
-            for i, batch in enumerate(titer):
+            titer = tqdm(diter) if learn else diter
+            #for i, batch in enumerate(titer):
+            for i, batch in enumerate([next(iter(diter))]):
                 if learn:
                     optimizer.zero_grad()
                 x, lens = batch.text
@@ -36,12 +37,13 @@ class Sent(nn.Module):
 
                 # keys 
                 k = [l, a]
-                kx = []
+                kx = [lx, ax]
 
                 # N x l x a x y, now N x y for dealing w imbalance
                 logits = self(x, lens, k, kx)
 
                 nll = self.loss(logits, y)
+                #import pdb; pdb.set_trace()
                 nelbo = nll
                 N = y.shape[0]
                 if learn:
@@ -59,13 +61,14 @@ class Sent(nn.Module):
                     titer.set_postfix(loss = batch_loss / batch_ntokens, gnorm = gnorm)
                     batch_loss = 0
                     batch_ntokens = 0
+        #print(f"train n: {cum_ntokens}")
         return cum_loss, cum_ntokens
 
-    def train_epoch(self, iter, optimizer, clip=0, re=None):
-        return self._loop(iter=iter, learn=True, optimizer=optimizer, clip=clip, re=re)
+    def train_epoch(self, diter, optimizer, clip=0, re=None):
+        return self._loop(diter=diter, learn=True, optimizer=optimizer, clip=clip, re=re)
 
-    def validate(self, iter):
-        return self._loop(iter=iter, learn=False)
+    def validate(self, diter):
+        return self._loop(diter=diter, learn=False)
 
     def forward(self):
         raise NotImplementedError
@@ -87,21 +90,25 @@ class Sent(nn.Module):
     def acc(self, iter):
         correct = 0.
         total = 0.
+        ftotal = 0.
         with torch.no_grad():
             for i, batch in enumerate(iter):
                 x, lens = batch.text
 
-                l, lene = batch.locations
-                a, lent = batch.aspects
+                l = batch.locations
+                a = batch.aspects
+                lx = batch.locations_text
+                ax = batch.aspects_text
                 y = batch.sentiments
                 N = y.shape[0]
                 # Aspects: 7, 8, 12, 16, or first 4
 
                 # keys 
                 k = [l, a]
+                kx = [lx, ax]
 
                 # N x l x a x y
-                logits = self(x, lens, k)
+                logits = self(x, lens, k, kx)
                 _, hy = logits.view(N, -1, 3).max(-1)
                 #y = y.view(N, 2, -1)
                 #import pdb; pdb.set_trace()
@@ -112,6 +119,9 @@ class Sent(nn.Module):
                 #total += y.nelement()
                 correct += (hy[y != 0] == y[y!=0]).sum().item()
                 total += y[y!=0].nelement()
+                ftotal += y.nelement()
+        #print(f"acc total y!=0: {total}")
+        #print(f"acc total: {ftotal}")
         return correct / total
 
 

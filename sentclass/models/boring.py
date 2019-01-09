@@ -12,6 +12,7 @@ class Boring(Sent):
         V = None,
         L = None,
         A = None,
+        S = None,
         Y_shape = None,
         emb_sz = 256,
         rnn_sz = 256,
@@ -28,6 +29,7 @@ class Boring(Sent):
         self.V = V
         self.L = L
         self.A = A
+        self.S = S
 
         self.Y_shape = Y_shape
         self.emb_sz = emb_sz
@@ -42,6 +44,10 @@ class Boring(Sent):
         )
         self.lut.weight.data.copy_(V.vectors)
         self.lut.weight.requires_grad = False
+        self.lut_la = nn.Embedding(
+            num_embeddings = len(L) * len(A),
+            embedding_dim = nlayers * 2 * 2 * rnn_sz,
+        )
         self.rnn = nn.LSTM(
             input_size = emb_sz,
             hidden_size = rnn_sz,
@@ -55,9 +61,16 @@ class Boring(Sent):
 
         # Score each sentiment for each location and aspect
         # Store the combined pos, neg, none in a single vector :(
+        """
         self.proj = nn.Embedding(
             num_embeddings = Y_shape[0] * Y_shape[1],
             embedding_dim = 2*rnn_sz*3
+        )
+        """
+        self.proj = nn.Linear(
+            in_features = 2 * rnn_sz,
+            out_features = len(S),
+            bias = False,
         )
         """
         self.proj = nn.Linear(
@@ -74,7 +87,14 @@ class Boring(Sent):
     def forward(self, x, lens, k, kx):
         emb = self.drop(self.lut(x))
         p_emb = pack(emb, lens, True)
-        x, (h, c) = self.rnn(p_emb)
+
+        l, a = k
+        N = l.shape[0]
+        # factor this out, for sure.
+        y_idx = l * self.Y_shape[0] + a
+        s = self.lut_la(y_idx).view(N, 2, 2 * self.nlayers, self.rnn_sz).permute(1, 2, 0, 3)
+        state = (s[0], s[1])
+        x, (h, c) = self.rnn(p_emb, state)
         # h: L * D x N x H
         x = unpack(x, True)[0]
         # y: N x D * H
@@ -85,14 +105,10 @@ class Boring(Sent):
             .permute(1, 0, 2)
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
-        l, a = k
-        # factor this out, for sure.
-        y_idx = l * self.Y_shape[0] + a
-        z = self.proj(y_idx.squeeze())
-        # need to split into 3
-        import pdb; pdb.set_trace()
-        Ys = self.Y_shape
-        return y
+        return self.proj(h)
+        #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
+        #Ys = self.Y_shape
+        #return torch.einsum("nyh,nh->ny", [z, h])
 
     def _old_forward(self, x, lens, k):
         emb = self.drop(self.lut(x))
