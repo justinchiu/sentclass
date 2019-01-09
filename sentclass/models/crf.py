@@ -13,16 +13,13 @@ class Crf(Ugm):
         L = None,
         A = None,
         S = None,
-        Y_shape = None,
         emb_sz = 256,
         rnn_sz = 256,
         nlayers = 2,
         dp = 0.3,
         tieweights = True,
     ):
-        super(Boring, self).__init__()
-
-        assert(Y_shape is not None)
+        super(Crf, self).__init__()
 
         self._N = 0
 
@@ -31,7 +28,6 @@ class Crf(Ugm):
         self.A = A
         self.S = S
 
-        self.Y_shape = Y_shape
         self.emb_sz = emb_sz
         self.rnn_sz = rnn_sz
         self.nlayers = nlayers
