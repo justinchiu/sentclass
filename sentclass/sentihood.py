@@ -87,11 +87,11 @@ def make_fields():
         #lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
     return TEXT, LOCATION, ASPECT, SENTIMENT
 
-def build_vocab(f1, f2, f3, f4, d):
-    f1.build_vocab(d)
-    f2.build_vocab(d)
-    f3.build_vocab(d)
-    f4.build_vocab(d)
+def build_vocab(f1, f2, f3, f4, d1, d2, d3):
+    f1.build_vocab(d1, d2, d3)
+    f2.build_vocab(d1, d2, d3)
+    f3.build_vocab(d1, d2, d3)
+    f4.build_vocab(d1, d2, d3)
 
 
 class SentihoodExample(Example):

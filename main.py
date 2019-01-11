@@ -1,4 +1,4 @@
-# python main.py --devid 1 --bsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --flat-data --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000
+# python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --flat-data --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000
 # python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000 --model crfnb --flat-data
  
 import argparse
@@ -91,7 +91,7 @@ TEXT, LOCATION, ASPECT, SENTIMENT = data.make_fields()
 train, valid, test = data.SentihoodDataset.splits(
     TEXT, LOCATION, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath)
 
-data.build_vocab(TEXT, LOCATION, ASPECT, SENTIMENT, train)
+data.build_vocab(TEXT, LOCATION, ASPECT, SENTIMENT, train, valid, test)
 TEXT.vocab.load_vectors(vectors=GloVe(name="42B"))
 TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
     (TEXT.vocab.vectors[TEXT.vocab.stoi["transit"]] +
@@ -199,6 +199,7 @@ for e in range(args.epochs):
 
     # Accuracy on train
     train_acc = model.acc(full_train_iter)
+    #train_acc = 0
     # Accuracy on Valid
     valid_acc = model.acc(valid_iter)
 

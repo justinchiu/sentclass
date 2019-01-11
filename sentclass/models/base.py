@@ -94,6 +94,7 @@ class Sent(nn.Module):
         correct = 0.
         total = 0.
         ftotal = 0.
+        #self._N += 1
         with torch.no_grad():
             for i, batch in enumerate(iter):
                 x, lens = batch.text
@@ -114,7 +115,6 @@ class Sent(nn.Module):
                 logits = self(x, lens, k, kx)
                 _, hy = logits.view(N, -1, 3).max(-1)
                 #y = y.view(N, 2, -1)
-                #import pdb; pdb.set_trace()
 
                 #hy = hy[:,:,:4]
                 #y = y[:,:,:4]
@@ -123,6 +123,8 @@ class Sent(nn.Module):
                 correct += (hy[y != 0] == y[y!=0]).sum().item()
                 total += y[y!=0].nelement()
                 ftotal += y.nelement()
+                #if self._N > 50:
+                    #import pdb; pdb.set_trace()
         #print(f"acc total y!=0: {total}")
         #print(f"acc total: {ftotal}")
         return correct / total
@@ -185,70 +187,5 @@ class Sent(nn.Module):
         F1 = 2 * P * R / (P + R)
         return F1
 
-
-class Crf(Sent):
-    def _loop(self, iter, optimizer=None, clip=0, learn=False, re=None):
-        context = torch.enable_grad if learn else torch.no_grad
-
-        cum_loss = 0
-        cum_ntokens = 0
-        cum_rx = 0
-        cum_kl = 0
-        batch_loss = 0
-        batch_ntokens = 0
-        states = None
-        with context():
-            titer = tqdm(iter) if learn else iter
-            for i, batch in enumerate(titer):
-                if learn:
-                    optimizer.zero_grad()
-                text, lens = batch.text
-                x = text[:-1]
-                y = text[1:]
-                lens = lens - 1
-
-                e, lene = batch.entities
-                t, lent = batch.types
-                v, lenv = batch.values
-                #rlen, N = e.shape
-                #r = torch.stack([e, t, v], dim=-1)
-                r = [e, t, v]
-                assert (lene == lent).all()
-                lenr = lene
-
-                # should i include <eos> in ppl?
-                nwords = y.ne(1).sum()
-                # assert nwords == lens.sum()
-                T, N = y.shape
-                #if states is None:
-                states = self.init_state(N)
-                logits, _ = self(x, states, lens, r, lenr)
-                nll = self.loss(logits, y)
-                kl = 0
-                nelbo = nll + kl
-                if learn:
-                    nelbo.div(nwords.item()).backward()
-                    if clip > 0:
-                        gnorm = clip_(self.parameters(), clip)
-                        #for param in self.rnn_parameters():
-                            #gnorm = clip_(param, clip)
-                    optimizer.step()
-                cum_loss += nelbo.item()
-                cum_ntokens += nwords.item()
-                batch_loss += nelbo.item()
-                batch_ntokens += nwords.item()
-                if re is not None and i % re == -1 % re:
-                    titer.set_postfix(loss = batch_loss / batch_ntokens, gnorm = gnorm)
-                    batch_loss = 0
-                    batch_ntokens = 0
-        return cum_loss, cum_ntokens
-
-
-    def loss(self, logits, y):
-        T, N = y.shape
-        yflat = y.view(-1, 1)
-        return -(F.log_softmax(logits, dim=-1)
-            .view(T*N, -1)
-            .gather(-1, yflat)[yflat != 1]
-            .sum())
-
+    def tostr(self, x):
+        return [self.V.itos[w] for w in x.tolist()] 
