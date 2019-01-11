@@ -1,5 +1,6 @@
 # python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --flat-data --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000
-# python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000 --model crfnb --flat-data
+# python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000 \
+# --model crfnb --flat-data
  
 import argparse
 
