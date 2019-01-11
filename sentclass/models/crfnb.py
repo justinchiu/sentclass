@@ -61,7 +61,7 @@ class CrfNb(Sent):
         # Store the combined pos, neg, none in a single vector :(
         self.proj_s = nn.Linear(
             in_features = 2 * rnn_sz,
-            out_features = len(S) + 1,
+            out_features = len(S),# + 1,
             bias = False,
         )
         #self.psi_ys = nn.Parameter(
@@ -106,11 +106,13 @@ class CrfNb(Sent):
         x = unpack(x, True)[0]
         # Get the last hidden states for both directions, POSSIBLE BUGS
         phi_s = self.proj_s(x)
+        """
         idxs = torch.arange(0, max(lens)).to(lens.device)
         # mask: N x R x 1
         mask = (idxs.repeat(len(lens), 1) >= lens.unsqueeze(-1))
         phi_s[:,:,-1].masked_fill_(1-mask, float("-inf"))
         phi_s[:,:,:3].masked_fill_(mask.unsqueeze(-1), float("-inf"))
+        """
         """
         h = (h
             .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
@@ -119,12 +121,14 @@ class CrfNb(Sent):
             .view(-1, 2 * self.rnn_sz))
         phi_y = self.proj_y(h)
         """
-        psi_ys = torch.cat(
-            [torch.diag(self.psi_ys), torch.zeros(len(self.S), 1).to(self.psi_ys)],
-            dim=-1,
-        ).repeat(T, 1, 1)
+        phi_y = torch.zeros(N, len(self.S)).to(self.psi_ys.device)
+        #psi_ys = torch.cat(
+            #[torch.diag(self.psi_ys), torch.zeros(len(self.S), 1).to(self.psi_ys)],
+            #dim=-1,
+        #).repeat(T, 1, 1)
+        psi_ys = torch.diag(self.psi_ys).repeat(T, 1, 1)
         # Z is really weird here
-        Z, hy = ubersum("nts,tys->n,ny", phi_s, psi_ys, batch_dims="t", modulo_total=True)
+        Z, hy = ubersum("nts,tys,ny->n,ny", phi_s, psi_ys, phi_y, batch_dims="t", modulo_total=True)
         #Z, hy = ubersum("nts,tys,ny->n,ny", phi_s, psi_ys, phi_y, batch_dims="t", modulo_total=True)
         def stuff(i):
             loc = self.L.itos[l[i]]
@@ -137,7 +141,7 @@ class CrfNb(Sent):
             xp = (hx - Zx.unsqueeze(-1)).exp()
             yp = (hy - Z.unsqueeze(-1)).exp()
             #Zx, hx = ubersum("nts,ys->nt,nts", phi_s, self.psi_ys, batch_dims="t")
-            #import pdb; pdb.set_trace()
+            import pdb; pdb.set_trace()
             pass
             # text, loc, asp, xpi, ypi = stuff(10)
         #import pdb; pdb.set_trace()
