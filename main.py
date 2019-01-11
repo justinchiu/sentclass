@@ -11,7 +11,8 @@ from torchtext.vocab import GloVe
 import sentclass.sentihood as data
 from sentclass.sentihood import RandomIterator
 from sentclass.models.boring import Boring
-from sentclass.models.crf import Crf
+from sentclass.models.crfnb import CrfNb
+from sentclass.models.crfsimple import CrfSimple
 
 import json
 
@@ -31,7 +32,8 @@ def get_args():
 
     parser.add_argument("--flat-data", action="store_true", default=False)
 
-    parser.add_argument("--bsz", default=32, type=int)
+    parser.add_argument("--bsz", default=48, type=int)
+    parser.add_argument("--ebsz", default=48, type=int)
     parser.add_argument("--epochs", default=32, type=int)
 
     parser.add_argument("--clip", default=5, type=float)
@@ -57,7 +59,7 @@ def get_args():
     # Model
     parser.add_argument(
         "--model",
-        choices=["boring", "crf"],
+        choices=["boring", "crfnb", "crfsimple"],
         default="boring"
     )
 
@@ -103,7 +105,7 @@ asp_iterator = BucketIterator
 
 train_iter, valid_iter, test_iter = iterator.splits(
     (train, valid, test),
-    batch_size = args.bsz,
+    batch_sizes = (args.bsz, args.ebsz, args.ebsz),
     device = device,
     repeat = False,
     sort_within_batch = True,
@@ -111,7 +113,7 @@ train_iter, valid_iter, test_iter = iterator.splits(
 )
 full_train_iter = RandomIterator(
     dataset = train,
-    batch_size = args.bsz,
+    batch_size = args.ebsz,
     device = device,
     repeat = False,
     sort_within_batch = True,
@@ -119,7 +121,7 @@ full_train_iter = RandomIterator(
 )
 asp_train_iter, asp_valid_iter, asp_test_iter = asp_iterator.splits(
     (asp_train, asp_valid, asp_test),
-    batch_size = args.bsz,
+    batch_size = args.ebsz,
     device = device,
     repeat = False,
     sort_within_batch = True,
@@ -141,8 +143,21 @@ if args.model == "boring":
         dp      = args.dp,
         tieweights = args.tieweights,
     )
-elif args.model == "crf":
-    model = Crf(
+if args.model == "crfnb":
+    assert(args.flat_data)
+    model = CrfNb(
+        V       = TEXT.vocab,
+        L       = LOCATION.vocab,
+        A       = ASPECT.vocab,
+        S       = SENTIMENT.vocab,
+        emb_sz  = args.emb_sz,
+        rnn_sz  = args.rnn_sz,
+        nlayers = args.nlayers,
+        dp      = args.dp,
+        tieweights = args.tieweights,
+    )
+elif args.model == "crfsimple":
+    model = CrfSimple(
         V       = TEXT.vocab,
         L       = LOCATION.vocab,
         A       = ASPECT.vocab,

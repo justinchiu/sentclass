@@ -1,4 +1,4 @@
-from .base import Sent
+from .ugm import Ugm
 from .. import sentihood as data
 
 import torch
@@ -6,23 +6,22 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
-class Boring(Sent):
+from pyro.ops.contract import ubersum
+
+class CrfSimple(Ugm):
     def __init__(
         self,
         V = None,
         L = None,
         A = None,
         S = None,
-        Y_shape = None,
         emb_sz = 256,
         rnn_sz = 256,
         nlayers = 2,
         dp = 0.3,
         tieweights = True,
     ):
-        super(Boring, self).__init__()
-
-        assert(Y_shape is not None)
+        super(CrfSimple, self).__init__()
 
         self._N = 0
 
@@ -31,7 +30,6 @@ class Boring(Sent):
         self.A = A
         self.S = S
 
-        self.Y_shape = Y_shape
         self.emb_sz = emb_sz
         self.rnn_sz = rnn_sz
         self.nlayers = nlayers
@@ -44,10 +42,7 @@ class Boring(Sent):
         )
         self.lut.weight.data.copy_(V.vectors)
         self.lut.weight.requires_grad = False
-        self.lut_la = nn.Embedding(
-            num_embeddings = len(L) * len(A),
-            embedding_dim = nlayers * 2 * 2 * rnn_sz,
-        )
+
         self.rnn = nn.LSTM(
             input_size = emb_sz,
             hidden_size = rnn_sz,
@@ -61,43 +56,43 @@ class Boring(Sent):
 
         # Score each sentiment for each location and aspect
         # Store the combined pos, neg, none in a single vector :(
-        self.proj = nn.Linear(
+        self.proj_s = nn.Linear(
             in_features = 2 * rnn_sz,
-            out_features = len(S),
+            out_features = len(S) * len(L),
             bias = True,
         )
+        self.proj_l = nn.Linear(
+            in_features = 2 * rnn_sz,
+            out_features = len(L) * 2,
+            bias = True,
+        )
+        self.proj_a = nn.Linear(
+            in_features = 2 * rnn_sz,
+            out_features = len(A),
+            bias = True,
+        )
+        self.theta = nn.Parameter(torch.Tensor([1.]))
+        self.psi_ys = nn.Parameter(
+            torch.randn(len(S), len(S)) + torch.eye(len(S))
+        )
 
-    def forward(self, x, lens, k, kx):
-        # model takes as input the text, aspect, and location
-        # runs BLSTM over text using embedding(location, aspect) as
-        # the initial hidden state, as opposed to a different lstm for every pair???
-        # output sentiment
+    def forward(self, x, lens, k, kx, y=None):
+        N, T = x.shape
+        L, A, S = self.L, self.A, self.S
         emb = self.drop(self.lut(x))
         p_emb = pack(emb, lens, True)
 
         l, a = k
-        N = l.shape[0]
-        # factor this out, for sure. POSSIBLE BUGS
-        y_idx = l * len(self.A) + a
-        s = (self.lut_la(y_idx)
-            .view(N, 2, 2 * self.nlayers, self.rnn_sz)
-            .permute(1, 2, 0, 3)
-            .contiguous())
-        state = (s[0], s[1])
-        x, (h, c) = self.rnn(p_emb, state)
-        # h: L * D x N x H
-        #x = unpack(x, True)[0]
-        # Get the last hidden states for both directions, POSSIBLE BUGS
-        h = (h
-            .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
-            .permute(1, 0, 2)
-            .contiguous()
-            .view(-1, 2 * self.rnn_sz))
+        x, _ = self.rnn(p_emb)
+        x = unpack(x, True)[0]
+        psi_ax = self.proj_a(x).view(N, T, len(A))
+        psi_sx = self.proj_s(x).view(N, T, len(L), len(S))
+        #psi_lx = self.proj_l(x).view(N, T, len(L), 2)
+        #psi_yas =
+        psi_ysa = self.psi_ysa
+        import pdb; pdb.set_trace()
+
         return self.proj(h)
-        # when there was a different sentiment rep for each l, a
-        #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
-        #Ys = self.Y_shape
-        #return torch.einsum("nyh,nh->ny", [z, h])
 
     def _old_forward(self, x, lens, k):
         emb = self.drop(self.lut(x))

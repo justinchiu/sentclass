@@ -65,9 +65,11 @@ class Sent(nn.Module):
         return cum_loss, cum_ntokens
 
     def train_epoch(self, diter, optimizer, clip=0, re=None):
+        self.train()
         return self._loop(diter=diter, learn=True, optimizer=optimizer, clip=clip, re=re)
 
     def validate(self, diter):
+        self.eval()
         return self._loop(diter=diter, learn=False)
 
     def forward(self):
@@ -88,6 +90,7 @@ class Sent(nn.Module):
             .sum())
 
     def acc(self, iter):
+        self.eval()
         correct = 0.
         total = 0.
         ftotal = 0.
@@ -129,6 +132,7 @@ class Sent(nn.Module):
             Only checks if aspects are nonzero.
             Cannot take in a flattened iterator.
         """
+        self.eval()
         p = 0.
         r = 0.
         Nf = 0
@@ -219,14 +223,6 @@ class Crf(Sent):
                 #if states is None:
                 states = self.init_state(N)
                 logits, _ = self(x, states, lens, r, lenr)
-                """
-                if learn:
-                    states = (
-                        [tuple(x.detach() for x in tup) for tup in states[0]],
-                        tuple(x.detach() for x in states[1]),
-                        states[2].detach(),
-                    )
-                """
                 nll = self.loss(logits, y)
                 kl = 0
                 nelbo = nll + kl

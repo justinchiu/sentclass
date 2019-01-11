@@ -41,7 +41,7 @@ class Ugm(Sent):
                 kx = [lx, ax]
 
                 # N x l x a x y, now N x y for dealing w imbalance
-                logits = self(x, lens, k, kx)
+                logits = self(x, lens, k, kx, y)
 
                 nll = self.loss(logits, y)
                 #import pdb; pdb.set_trace()
