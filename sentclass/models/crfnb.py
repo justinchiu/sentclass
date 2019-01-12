@@ -124,7 +124,7 @@ class CrfNb(Sent):
         psi_ys = torch.cat(
             [torch.diag(self.psi_ys), torch.zeros(len(self.S), 1).to(self.psi_ys)],
             dim=-1,
-        ).repeat(T, 1, 1)
+        ).expand(T, len(self.S), len(self.S)+1)
         #psi_ys = torch.diag(self.psi_ys).repeat(T, 1, 1)
         # Z is really weird here
         Z, hy = ubersum("nts,tys,ny->n,ny", phi_s, psi_ys, phi_y, batch_dims="t", modulo_total=True)
