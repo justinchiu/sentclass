@@ -136,11 +136,11 @@ class CrfNb(Sent):
         if self.training:
             self._N += 1
         if self._N > 100 and self.training:
-            Zx, hx = ubersum("nts,tys->nt,nts", phi_s, psi_ys, batch_dims="t")
+            Zx, hx = ubersum("nts,tys->nt,nts", phi_s, psi_ys, batch_dims="t", modulo_total=True)
             xp = (hx - Zx.unsqueeze(-1)).exp()
             yp = (hy - Z.unsqueeze(-1)).exp()
             #Zx, hx = ubersum("nts,ys->nt,nts", phi_s, self.psi_ys, batch_dims="t")
-            #import pdb; pdb.set_trace()
+            import pdb; pdb.set_trace()
             pass
             # text, loc, asp, xpi, ypi = stuff(10)
         #import pdb; pdb.set_trace()
