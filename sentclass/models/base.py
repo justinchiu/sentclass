@@ -123,9 +123,10 @@ class Sent(nn.Module):
                 correct += (hy[y != 0] == y[y!=0]).sum().item()
                 total += y[y!=0].nelement()
                 ftotal += y.nelement()
+                #import pdb; pdb.set_trace()
                 #if self._N > 50:
                     #import pdb; pdb.set_trace()
-        #print(f"acc total y!=0: {total}")
+        print(f"acc total y!=0: {total}")
         #print(f"acc total: {ftotal}")
         return correct / total
 
@@ -163,24 +164,38 @@ class Sent(nn.Module):
                 hy = torch.cat(hys, dim=-1)
 
                 # reshape into targets
+                hy0 = hy.view(N*2, len(self.A))
+                y0 = y.view(N*2, len(self.A))
                 hy = hy.view(N*2, len(self.A)).ne(0)
                 y = y.view(N*2, len(self.A)).ne(0)
 
                 mask = y.sum(-1).ne(0)
+                hy0 = hy0[mask]
+                y0 = y0[mask]
                 hy = hy[mask]
                 y = y[mask]
 
                 pi = (hy * y).sum(-1).float() / hy.sum(-1).float()
                 ri = (hy * y).sum(-1).float() / y.sum(-1).float()
                 Ni = y.shape[0]
+                # calculate intersection - # of overlapping 0s
+                intersection = (hy0 == y0).sum(-1)
+                intersection0 = (hy0.eq(0) * y0.eq(0)).sum(-1)
+                correct = (intersection - intersection0).float()
+                pi0 = correct / hy.sum(-1).float()
+                ri0 = correct / y.sum(-1).float()
+
                 pi[pi != pi] = 0
+                pi0[pi0 != pi0] = 0
                 if (pi != pi).any():
                     import pdb; pdb.set_trace()
                 if (ri != ri).any():
                     import pdb; pdb.set_trace()
 
-                p += pi.sum().item()
-                r += ri.sum().item()
+                #p += pi.sum().item()
+                #r += ri.sum().item()
+                p += pi0.sum().item()
+                r += ri0.sum().item()
                 Nf += Ni
         P = p / Nf
         R = r / Nf

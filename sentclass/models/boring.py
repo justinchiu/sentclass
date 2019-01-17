@@ -63,7 +63,7 @@ class Boring(Sent):
         # Store the combined pos, neg, none in a single vector :(
         self.proj = nn.Linear(
             in_features = 2 * rnn_sz,
-            out_features = len(S),
+            out_features = len(A) * len(S),
             bias = True,
         )
 
@@ -93,7 +93,12 @@ class Boring(Sent):
             .permute(1, 0, 2)
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
-        return self.proj(h)
+        #import pdb; pdb.set_trace()
+        ok = self.proj(h).view(N, len(self.A), len(self.S))
+
+        lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
+        #return self.proj(h).view(N, len(self.A), len(self.S)).gather(1, a.unsqueeze(-1).expand(N, 1, len(self.S))).squeeze(1)
+        return lol.squeeze(1)
         # when there was a different sentiment rep for each l, a
         #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
         #Ys = self.Y_shape
