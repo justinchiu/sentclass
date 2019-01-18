@@ -43,7 +43,7 @@ class Boring(Sent):
             padding_idx = V.stoi[self.PAD],
         )
         self.lut.weight.data.copy_(V.vectors)
-        self.lut.weight.requires_grad = False
+        #self.lut.weight.requires_grad = False
         self.lut_la = nn.Embedding(
             num_embeddings = len(L) * len(A),
             embedding_dim = nlayers * 2 * 2 * rnn_sz,
