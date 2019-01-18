@@ -70,8 +70,8 @@ class Boring(Sent):
         
         import torch.nn.init
         for p in self.parameters():
-            if p.requires_grad:
-                torch.nn.init.xavier_uniform(p)
+            if p.requires_grad and p.dim() == 2:
+                torch.nn.init.xavier_uniform_(p)
 
 
     def forward(self, x, lens, k, kx):
