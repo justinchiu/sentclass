@@ -29,6 +29,8 @@ class CrfNb(Sent):
         self.L = L
         self.A = A
         self.S = S
+        if L is None:
+            L = [1]
 
         self.emb_sz = emb_sz
         self.rnn_sz = rnn_sz
@@ -91,10 +93,10 @@ class CrfNb(Sent):
         p_emb = pack(emb, lens, True)
 
         l, a = k
-        N = l.shape[0]
+        N = x.shape[0]
         T = x.shape[1]
         # factor this out, for sure. POSSIBLE BUGS
-        y_idx = l * len(self.A) + a
+        y_idx = l * len(self.A) + a if self.L is not None else a
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
             .permute(1, 2, 0, 3)
@@ -140,7 +142,7 @@ class CrfNb(Sent):
             xp = (hx - Zx.unsqueeze(-1)).exp()
             yp = (hy - Z.unsqueeze(-1)).exp()
             #Zx, hx = ubersum("nts,ys->nt,nts", phi_s, self.psi_ys, batch_dims="t")
-            import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
             pass
             # text, loc, asp, xpi, ypi = stuff(10)
         #import pdb; pdb.set_trace()

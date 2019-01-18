@@ -13,7 +13,6 @@ class Boring(Sent):
         L = None,
         A = None,
         S = None,
-        Y_shape = None,
         emb_sz = 256,
         rnn_sz = 256,
         nlayers = 2,
@@ -22,16 +21,15 @@ class Boring(Sent):
     ):
         super(Boring, self).__init__()
 
-        assert(Y_shape is not None)
-
         self._N = 0
 
         self.V = V
         self.L = L
         self.A = A
         self.S = S
+        if L is None:
+            L = [0]
 
-        self.Y_shape = Y_shape
         self.emb_sz = emb_sz
         self.rnn_sz = rnn_sz
         self.nlayers = nlayers
@@ -77,10 +75,10 @@ class Boring(Sent):
         p_emb = pack(emb, lens, True)
 
         l, a = k
-        N = l.shape[0]
+        N = a.shape[0]
         # factor this out, for sure. POSSIBLE BUGS
-        y_idx = l * len(self.A) + a
-        y_idx = a
+        y_idx = l * len(self.A) + a if self.L is not None else a
+        #y_idx = a
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
             .permute(1, 2, 0, 3)
@@ -97,12 +95,12 @@ class Boring(Sent):
             .view(-1, 2 * self.rnn_sz))
         #import pdb; pdb.set_trace()
         ok = self.proj(h).view(N, len(self.A), len(self.S))
-        lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
-        return lol.squeeze(1)
+        return ok[:,0,:]
+        #lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
+        #return lol.squeeze(1)
         #return self.proj(h)
         # when there was a different sentiment rep for each l, a
         #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
-        #Ys = self.Y_shape
         #return torch.einsum("nyh,nh->ny", [z, h])
 
     def _old_forward(self, x, lens, k):
@@ -118,5 +116,4 @@ class Boring(Sent):
             .permute(1, 0, 2)
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
-        Ys = self.Y_shape
         return self.proj(y).view(-1, Ys[0], Ys[1], Ys[2])

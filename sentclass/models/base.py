@@ -23,8 +23,8 @@ class Sent(nn.Module):
         batch_ntokens = 0
         with context():
             titer = tqdm(diter) if learn else diter
-            #for i, batch in enumerate(titer):
-            for i, batch in enumerate([next(iter(diter))]):
+            for i, batch in enumerate(titer):
+            #for i, batch in enumerate([next(iter(diter))]):
                 if learn:
                     optimizer.zero_grad()
                 x, lens = batch.text
@@ -85,7 +85,7 @@ class Sent(nn.Module):
         #N = y.shape
         yflat = y.view(-1, 1)
         return -(F.log_softmax(logits, dim=-1)
-            .view(-1, logits.shape[-1])
+            #.view(-1, logits.shape[-1])
             .gather(-1, yflat)#[yflat != 1]
             .sum())
 
@@ -94,7 +94,7 @@ class Sent(nn.Module):
         correct = 0.
         total = 0.
         ftotal = 0.
-        #self._N += 1
+        self._N += 1
         with torch.no_grad():
             for i, batch in enumerate(iter):
                 x, lens = batch.text
@@ -113,18 +113,18 @@ class Sent(nn.Module):
 
                 # N x l x a x y
                 logits = self(x, lens, k, kx)
-                _, hy = logits.view(N, -1, 3).max(-1)
+                _, hy = logits.view(N, -1, len(self.S)).max(-1)
                 #y = y.view(N, 2, -1)
 
                 #hy = hy[:,:,:4]
                 #y = y[:,:,:4]
-                #correct += (hy == y).sum().item()
-                #total += y.nelement()
-                correct += (hy[y != 0] == y[y!=0]).sum().item()
-                total += y[y!=0].nelement()
+                correct += (hy == y).sum().item()
+                total += y.nelement()
+                #correct += (hy[y != 0] == y[y!=0]).sum().item()
+                #total += y[y!=0].nelement()
                 ftotal += y.nelement()
                 #import pdb; pdb.set_trace()
-                #if self._N > 50:
+                #if self._N > 10:
                     #import pdb; pdb.set_trace()
         print(f"acc total y!=0: {total}")
         #print(f"acc total: {ftotal}")

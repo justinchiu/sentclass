@@ -1,7 +1,4 @@
-# python main.py --devid 2 --bsz 150 --ebsz 150 --rnn-sz 100 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.5 \
-# --epochs 5000 --model boring
-# python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000 \
-# --model crfnb --flat-data
+# python main.py --devid 3 --bsz 32 --ebsz 32 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model boring
  
 import argparse
 
@@ -90,51 +87,6 @@ torch.cuda.manual_seed(args.seed)
 device = torch.device(f"cuda:{args.devid}" if args.devid >= 0 else "cpu")
 
 # Data
-"""
-if args.data == "sentihood":
-    import sentclass.sentihood as data
-    from sentclass.sentihood import RandomIterator
-
-    TEXT, LOCATION, ASPECT, SENTIMENT = data.make_fields()
-    train, valid, test = data.SentihoodDataset.splits(
-        TEXT, LOCATION, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath)
-
-    data.build_vocab(TEXT, LOCATION, ASPECT, SENTIMENT, train, valid, test)
-    TEXT.vocab.load_vectors(vectors=GloVe(name="42B"))
-    TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
-        (TEXT.vocab.vectors[TEXT.vocab.stoi["transit"]] +
-            TEXT.vocab.vectors[TEXT.vocab.stoi["location"]]) / 2
-    )
-
-    iterator = BucketIterator if not args.flat_data else RandomIterator
-    asp_iterator = BucketIterator
-
-    train_iter, valid_iter, test_iter = iterator.splits(
-        (train, valid, test),
-        batch_sizes = (args.bsz, args.ebsz, args.ebsz),
-        device = device,
-        repeat = False,
-        sort_within_batch = True,
-        #sort_key = already given in dataset?
-    )
-    full_train_iter = RandomIterator(
-        dataset = train,
-        batch_size = args.ebsz,
-        device = device,
-        repeat = False,
-        sort_within_batch = True,
-        train = False,
-    )
-    asp_train_iter, asp_valid_iter, asp_test_iter = asp_iterator.splits(
-        (asp_train, asp_valid, asp_test),
-        batch_size = args.ebsz,
-        device = device,
-        repeat = False,
-        sort_within_batch = True,
-    )
-    #import pdb; pdb.set_trace()
-elif args.data == "semeval":
-    """
 import sentclass.semeval as data
 
 TEXT, LOCATION, ASPECT, SENTIMENT = data.make_fields()
