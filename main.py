@@ -93,7 +93,7 @@ train, valid, test = data.SentihoodDataset.splits(
     TEXT, LOCATION, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath)
 
 data.build_vocab(TEXT, LOCATION, ASPECT, SENTIMENT, train, valid, test)
-TEXT.vocab.load_vectors(vectors=GloVe(name="42B"))
+TEXT.vocab.load_vectors(vectors=GloVe(name="840B"))
 TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
     (TEXT.vocab.vectors[TEXT.vocab.stoi["transit"]] +
         TEXT.vocab.vectors[TEXT.vocab.stoi["location"]]) / 2
