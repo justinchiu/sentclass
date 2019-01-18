@@ -67,6 +67,12 @@ class Boring(Sent):
             #out_features = len(S),
             bias = True,
         )
+        
+        #import torch.nn.init
+        #for p in self.parameters():
+        #    if p.requires_grad and p.dim() == 2:
+        #        torch.nn.init.xavier_uniform_(p)
+
 
     def forward(self, x, lens, k, kx):
         # model takes as input the text, aspect, and location
@@ -95,10 +101,13 @@ class Boring(Sent):
             .permute(1, 0, 2)
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
+        h = self.drop(h)
         #import pdb; pdb.set_trace()
         ok = self.proj(h).view(N, len(self.A), len(self.S))
-        lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
-        return lol.squeeze(1)
+        return ok[:,0,:]
+    
+        ##lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
+        ##return lol.squeeze(1)
         #return self.proj(h)
         # when there was a different sentiment rep for each l, a
         #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
