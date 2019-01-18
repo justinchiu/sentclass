@@ -64,6 +64,7 @@ class Boring(Sent):
         self.proj = nn.Linear(
             in_features = 2 * rnn_sz,
             out_features = len(A) * len(S),
+            #out_features = len(S),
             bias = True,
         )
 
@@ -79,6 +80,7 @@ class Boring(Sent):
         N = l.shape[0]
         # factor this out, for sure. POSSIBLE BUGS
         y_idx = l * len(self.A) + a
+        y_idx = a
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
             .permute(1, 2, 0, 3)
@@ -95,10 +97,9 @@ class Boring(Sent):
             .view(-1, 2 * self.rnn_sz))
         #import pdb; pdb.set_trace()
         ok = self.proj(h).view(N, len(self.A), len(self.S))
-
         lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
-        #return self.proj(h).view(N, len(self.A), len(self.S)).gather(1, a.unsqueeze(-1).expand(N, 1, len(self.S))).squeeze(1)
         return lol.squeeze(1)
+        #return self.proj(h)
         # when there was a different sentiment rep for each l, a
         #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
         #Ys = self.Y_shape
