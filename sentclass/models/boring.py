@@ -43,7 +43,7 @@ class Boring(Sent):
             padding_idx = V.stoi[self.PAD],
         )
         self.lut.weight.data.copy_(V.vectors)
-        #self.lut.weight.requires_grad = False
+        self.lut.weight.requires_grad = False
         self.lut_la = nn.Embedding(
             num_embeddings = len(L) * len(A),
             embedding_dim = nlayers * 2 * 2 * rnn_sz,
@@ -67,6 +67,12 @@ class Boring(Sent):
             #out_features = len(S),
             bias = True,
         )
+        
+        import torch.nn.init
+        for p in params:
+            if p.requires_grad:
+                torch.nn.init.xavier_uniform(p)
+
 
     def forward(self, x, lens, k, kx):
         # model takes as input the text, aspect, and location
