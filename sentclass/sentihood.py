@@ -83,7 +83,7 @@ def make_fields():
     LOCATION = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
     ASPECT = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
     TEXT = Field(
-        lower=True, include_lengths=True, is_target=True, batch_first=True)
+        lower=False, include_lengths=True, is_target=True, batch_first=True)
         #lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
     return TEXT, LOCATION, ASPECT, SENTIMENT
 
