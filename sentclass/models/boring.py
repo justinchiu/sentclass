@@ -98,8 +98,10 @@ class Boring(Sent):
         h = self.drop(h)
         #import pdb; pdb.set_trace()
         ok = self.proj(h).view(N, len(self.A), len(self.S))
-        lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
-        return lol.squeeze(1)
+        return ok[:,0,:]
+    
+        ##lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
+        ##return lol.squeeze(1)
         #return self.proj(h)
         # when there was a different sentiment rep for each l, a
         #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
