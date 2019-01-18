@@ -69,7 +69,7 @@ class Boring(Sent):
         )
         
         import torch.nn.init
-        for p in params:
+        for p in self.params():
             if p.requires_grad:
                 torch.nn.init.xavier_uniform(p)
 
