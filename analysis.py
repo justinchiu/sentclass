@@ -39,12 +39,15 @@ TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
 
 f = lambda num: f"{num:0.2f}"
 
-# [77, 81+83]
+# [77, 81+83, 84!]
 # valid: 77, 83!, 84, 120?, 147??, 193?
 # valid locations: 148
 # valid wtf: 153, 188, 219
 # both bad: 215
-# 
+
+ 
+print("===== Hand-crafted experiment for negation =====")
+
 t0 = ["location1", "is", "very", "safe"]
 x, lens = TEXT.process([t0])
 a = torch.LongTensor([[2]])
@@ -53,11 +56,22 @@ y = torch.LongTensor([[1]])
 s0, psi_ys0 = crfnb1.observe(x, lens, l, a, y)
 ss0 = torch.softmax(s0, -1)
 sy0 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+ok0 = list(zip(["<bos>"] + t0 + ["<eos>"], ss0[0].tolist(), psi_ys0[0,:,1:,1:].transpose(-1,-2).tolist()))
+print("Positive sentiment")
+for w, x, y in ok0:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
+print()
 
+t0 = ["location1", "is", "very", "safe"]
+x, lens = TEXT.process([t0])
 y = torch.LongTensor([[2]])
 s02, psi_ys02 = crfnb1.observe(x, lens, l, a, y)
 ss02 = torch.softmax(s02, -1)
 sy02 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+ok02 = list(zip(["<bos>"] + t0 + ["<eos>"], ss02[0].tolist(), psi_ys02[0,:,1:,1:].transpose(-1,-2).tolist()))
+for w, x, y in ok02:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
+print()
 
 t1 = ["location1", "is", "not", "safe"]
 x, lens = TEXT.process([t1])
@@ -67,6 +81,11 @@ y = torch.LongTensor([[2]])
 s1, psi_ys1 = crfnb1.observe(x, lens, l, a, y)
 ss1 = torch.softmax(s1, -1)
 sy1 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+ok1 = list(zip(["<bos>"] + t1 + ["<eos>"], ss1[0].tolist(), psi_ys1[0,:,1:,1:].transpose(-1,-2).tolist()))
+print("Negative Sentiment")
+for w, x, y in ok1:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
+print()
 
 t2 = ["location1", "is", "not", "safe"]
 x, lens = TEXT.process([t2])
@@ -76,32 +95,70 @@ y = torch.LongTensor([[1]])
 s2, psi_ys2 = crfnb1.observe(x, lens, l, a, y)
 ss2 = torch.softmax(s2, -1)
 sy2 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
-
-ok0 = list(zip(["<bos>"] + t0 + ["<eos>"], ss0[0].tolist(), psi_ys0[0,:,1:,1:].transpose(-1,-2).tolist()))
-ok02 = list(zip(["<bos>"] + t0 + ["<eos>"], ss02[0].tolist(), psi_ys02[0,:,1:,1:].transpose(-1,-2).tolist()))
-ok1 = list(zip(["<bos>"] + t1 + ["<eos>"], ss1[0].tolist(), psi_ys1[0,:,1:,1:].transpose(-1,-2).tolist()))
 ok2 = list(zip(["<bos>"] + t2 + ["<eos>"], ss2[0].tolist(), psi_ys2[0,:,1:,1:].transpose(-1,-2).tolist()))
-
-print("===== Hand-crafted experiment for negation =====")
-print("Positive sentiment")
-for w, x, y in ok0:
-    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
-print()
-print("Negative Sentiment")
-for w, x, y in ok02:
-    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
-print()
-print("Negative Sentiment")
-for w, x, y in ok1:
-    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
-print()
 print("Positive sentiment")
 for w, x, y in ok2:
     print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
 print()
 
+
+t0 = ["location1", "is", "very", "safe"]
+x, lens = TEXT.process([t0])
+y = torch.LongTensor([[1]])
+#s02, psi_ys02 = crfnb1.observe(x, lens, l, a, y)
+s02 = boring.observe(x, lens, l, a, y)
+ss02 = torch.softmax(s02, -1)
+#sy02 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+sy02 = torch.softmax(boring(x, lens, [l,a], [l,a]), -1)
+ok02 = list(zip(["<bos>"] + t0 + ["<eos>"], ss02[0].tolist()))
+for w, x in ok02:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]")
+print()
+t0 = ["location1", "is", "not", "safe"]
+x, lens = TEXT.process([t0])
+y = torch.LongTensor([[2]])
+#s02, psi_ys02 = crfnb1.observe(x, lens, l, a, y)
+s02 = boring.observe(x, lens, l, a, y)
+ss02 = torch.softmax(s02, -1)
+#sy02 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+sy02 = torch.softmax(boring(x, lens, [l,a], [l,a]), -1)
+ok02 = list(zip(["<bos>"] + t0 + ["<eos>"], ss02[0].tolist()))
+for w, x in ok02:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]")
+print()
+#import pdb; pdb.set_trace()
+print("===== Comparisons between models =====")
+t2 = ["location1", "is", "not", "safe"]
+x, lens = TEXT.process([t2])
+a = torch.LongTensor([[2]])
+l = torch.LongTensor([[0]])
+y = torch.LongTensor([[1]])
+
+s0 = boring.observe(x, lens, l, a, y)
+s1 = crfnb.observe(x, lens, l, a, y)
+s2, psi_ys = crfnb1.observe(x, lens, l, a, y)
+s3, psi_ys1 = crfnb2.observe(x, lens, l, a, y)
 #import pdb; pdb.set_trace()
 
+ss0 = torch.softmax(s0, -1)
+ss1 = torch.softmax(s1, -1)
+ss2 = torch.softmax(s2, -1)
+ss3 = torch.softmax(s3, -1)
+print()
+print(" ".join(t2))
+print(f"aspect: {ASPECT.vocab.itos[a.item()]}")
+print(f"location: {LOCATION.vocab.itos[l.item()]}")
+print(f"sentiment: {SENTIMENT.vocab.itos[y.item()]}")
+ok = list(zip(["<bos>"] + t2 + ["<eos>"], ss0[0].tolist(), ss1[0,:,:-1].tolist(), ss3[0].tolist(), ss2[0].tolist(), psi_ys[0,:,1:,1:].transpose(-1, -2).tolist()))
+print("## model comparison ##")
+for w, x, y, a, z, p in ok:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t[{' '.join(map(f, y))}]\t[{' '.join(map(f, a))}]\t[{' '.join(map(f, z))}]")
+print()
+#print("## conditional || unary || interaction matrix ##")
+#for w, x, y, a, z, p in ok:
+    #print(f"{w:<10}:\t[{' '.join(map(f, z))}]\t{p}")
+
+import pdb; pdb.set_trace()
 print("===== Comparisons on valid between models =====")
 dataset = valid
 for i in range(0, len(dataset)):
@@ -127,8 +184,8 @@ for i in range(0, len(dataset)):
         for w, x, y, a, z, p in ok:
             print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t[{' '.join(map(f, y))}]\t[{' '.join(map(f, a))}]\t[{' '.join(map(f, z))}]")
         print()
-        print("## conditional || unary || interaction matrix ##")
-        for w, x, y, a, z, p in ok:
-            print(f"{w:<10}:\t[{' '.join(map(f, z))}]\t{p}")
+        #print("## conditional || unary || interaction matrix ##")
+        #for w, x, y, a, z, p in ok:
+            #print(f"{w:<10}:\t[{' '.join(map(f, z))}]\t{p}")
 
         import pdb; pdb.set_trace()
