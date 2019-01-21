@@ -12,7 +12,7 @@ from torch.nn.utils import clip_grad_norm_ as clip_
 class Sent(nn.Module):
     PAD = "<pad>"
 
-    def _loop(self, diter, optimizer=None, clip=0, learn=False, re=None):
+    def _loop(self, diter, optimizer=None, clip=0, learn=False, re=None, once=False):
         context = torch.enable_grad if learn else torch.no_grad
 
         cum_loss = 0
@@ -23,8 +23,7 @@ class Sent(nn.Module):
         batch_ntokens = 0
         with context():
             titer = tqdm(diter) if learn else diter
-            for i, batch in enumerate(titer):
-            #for i, batch in enumerate([next(iter(diter))]):
+            for i, batch in enumerate(titer if not once else [next(iter(diter))]):
                 if learn:
                     optimizer.zero_grad()
                 x, lens = batch.text
@@ -64,9 +63,9 @@ class Sent(nn.Module):
         #print(f"train n: {cum_ntokens}")
         return cum_loss, cum_ntokens
 
-    def train_epoch(self, diter, optimizer, clip=0, re=None):
+    def train_epoch(self, diter, optimizer, clip=0, re=None, once=False):
         self.train()
-        return self._loop(diter=diter, learn=True, optimizer=optimizer, clip=clip, re=re)
+        return self._loop(diter=diter, learn=True, optimizer=optimizer, clip=clip, re=re, once=once)
 
     def validate(self, diter):
         self.eval()
@@ -89,7 +88,7 @@ class Sent(nn.Module):
             .gather(-1, yflat)#[yflat != 1]
             .sum())
 
-    def acc(self, iter):
+    def acc(self, iter, skip0=False):
         self.eval()
         correct = 0.
         total = 0.
@@ -118,10 +117,12 @@ class Sent(nn.Module):
 
                 #hy = hy[:,:,:4]
                 #y = y[:,:,:4]
-                correct += (hy == y).sum().item()
-                total += y.nelement()
-                #correct += (hy[y != 0] == y[y!=0]).sum().item()
-                #total += y[y!=0].nelement()
+                if skip0:
+                    correct += (hy[y != 0] == y[y!=0]).sum().item()
+                    total += y[y!=0].nelement()
+                else:
+                    correct += (hy == y).sum().item()
+                    total += y.nelement()
                 ftotal += y.nelement()
                 #import pdb; pdb.set_trace()
                 #if self._N > 10:
@@ -199,6 +200,8 @@ class Sent(nn.Module):
                 Nf += Ni
         P = p / Nf
         R = r / Nf
+        if P == 0 and R == 0:
+            import pdb; pdb.set_trace()
         F1 = 2 * P * R / (P + R)
         return F1
 

@@ -8,7 +8,7 @@ from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 from pyro.ops.contract import ubersum
 
-class CrfNb(Sent):
+class CrfNb1(Sent):
     def __init__(
         self,
         V = None,
@@ -21,7 +21,7 @@ class CrfNb(Sent):
         dp = 0.3,
         tieweights = True,
     ):
-        super(CrfNb, self).__init__()
+        super(CrfNb1, self).__init__()
 
         self._N = 0
 
@@ -43,17 +43,18 @@ class CrfNb(Sent):
             padding_idx = V.stoi[self.PAD],
         )
         self.lut.weight.data.copy_(V.vectors)
+        self.lut.weight.data[V.stoi[self.PAD]] = 0
         self.lut.weight.requires_grad = False
         self.lut_la = nn.Embedding(
             num_embeddings = len(L) * len(A),
             embedding_dim = nlayers * 2 * 2 * rnn_sz,
         )
         self.rnn = nn.LSTM(
-            input_size = emb_sz,
-            hidden_size = rnn_sz,
-            num_layers = nlayers,
-            bias = True,
-            dropout = dp,
+            input_size    = emb_sz,
+            hidden_size   = rnn_sz,
+            num_layers    = nlayers,
+            bias          = True,
+            dropout       = dp,
             bidirectional = True,
             batch_first   = True,
         )
@@ -61,18 +62,15 @@ class CrfNb(Sent):
 
         # Score each sentiment for each location and aspect
         # Store the combined pos, neg, none in a single vector :(
-        self.proj_s = nn.Linear(
+        self.proj_s = nn.Parameter(torch.randn(len(L)*len(A), len(S), emb_sz))
+        self.proj_s.data[:,:,self.S.stoi["none"]].mul_(2)
+        # only let non-neutral interact with non-neutral
+        self.psi_none = nn.Parameter(torch.FloatTensor([0.1]))
+        self.proj_ys = nn.Linear(
             in_features = 2 * rnn_sz,
-            #out_features = len(S),# + 1,
-            out_features = len(S) + 1,
+            out_features = (len(S)-1) * (len(S)-1),
             bias = False,
         )
-        #self.psi_ys = nn.Parameter(
-            #torch.randn(len(S), len(S)) + torch.eye(len(S))
-        #)
-        #self.theta = nn.Parameter(torch.FloatTensor([10]))
-        self.psi_ys = nn.Parameter(torch.FloatTensor([0.1, 0.1, 0.1]))
-        #self.psi_ys.requires_grad = False
         self.proj_y = nn.Linear(
             in_features = 2 * rnn_sz,
             out_features = len(S),
@@ -105,32 +103,24 @@ class CrfNb(Sent):
         x, (h, c) = self.rnn(p_emb, state)
         # h: L * D x N x H
         x = unpack(x, True)[0]
-        # Get the last hidden states for both directions, POSSIBLE BUGS
-        phi_s = self.proj_s(x)
-        #"""
+        proj_s = self.proj_s[y_idx.squeeze(-1)]
+        phi_s = torch.einsum("nsh,nth->nts", [proj_s, emb])
+
         idxs = torch.arange(0, max(lens)).to(lens.device)
         # mask: N x R x 1
         mask = (idxs.repeat(len(lens), 1) >= lens.unsqueeze(-1))
-        phi_s[:,:,-1].masked_fill_(1-mask, float("-inf"))
-        phi_s[:,:,:3].masked_fill_(mask.unsqueeze(-1), float("-inf"))
-        #"""
-        """
-        h = (h
-            .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
-            .permute(1, 0, 2)
-            .contiguous()
-            .view(-1, 2 * self.rnn_sz))
-        phi_y = self.proj_y(h)
-        """
-        phi_y = torch.zeros(N, len(self.S)).to(self.psi_ys.device)
-        psi_ys = torch.cat(
-            [torch.diag(self.psi_ys), torch.zeros(len(self.S), 1).to(self.psi_ys)],
-            dim=-1,
-        ).expand(T, len(self.S), len(self.S)+1)
-        #psi_ys = torch.diag(self.psi_ys).repeat(T, 1, 1)
-        # Z is really weird here
-        Z, hy = ubersum("nts,tys,ny->n,ny", phi_s, psi_ys, phi_y, batch_dims="t", modulo_total=True)
-        #Z, hy = ubersum("nts,tys,ny->n,ny", phi_s, psi_ys, phi_y, batch_dims="t", modulo_total=True)
+        phi_y = torch.zeros(N, len(self.S)).to(self.lut.weight.device)
+        psi_ys = self.proj_ys(x).view(N, T, len(self.S)-1, len(self.S)-1)
+        left = torch.zeros(N, T, 1, len(self.S)-1).to(psi_ys)
+        top = torch.cat(
+            [self.psi_none, torch.zeros(len(self.S)-1).to(psi_ys)],
+            0,
+        ).view(1,1,len(self.S),1).expand(N,T,len(self.S),1)
+        psi_ys = torch.cat([top, torch.cat([left, psi_ys], -2)], -1)
+        # mask phi_s, psi_ys...actually these are mostly unnecessary
+        phi_s.masked_fill_(mask.unsqueeze(-1), 0) 
+        psi_ys = psi_ys.masked_fill_(mask.view(N, T, 1, 1), 0)
+        Z, hy = ubersum("nts,ntys,ny->n,ny", phi_s, psi_ys, phi_y, batch_dims="t", modulo_total=True)
         def stuff(i):
             loc = self.L.itos[l[i]]
             asp = self.A.itos[a[i]]
@@ -138,7 +128,7 @@ class CrfNb(Sent):
         if self.training:
             self._N += 1
         if self._N > 100 and self.training:
-            Zx, hx = ubersum("nts,tys->nt,nts", phi_s, psi_ys, batch_dims="t", modulo_total=True)
+            Zx, hx = ubersum("nts,ntys->nt,nts", phi_s, psi_ys, batch_dims="t", modulo_total=True)
             xp = (hx - Zx.unsqueeze(-1)).exp()
             yp = (hy - Z.unsqueeze(-1)).exp()
             #Zx, hx = ubersum("nts,ys->nt,nts", phi_s, self.psi_ys, batch_dims="t")
@@ -167,27 +157,22 @@ class CrfNb(Sent):
         x, (h, c) = self.rnn(p_emb, state)
         # h: L * D x N x H
         x = unpack(x, True)[0]
-        # Get the last hidden states for both directions, POSSIBLE BUGS
-        phi_s = self.proj_s(x)
-        #"""
+
+        proj_s = self.proj_s[y_idx.squeeze(-1)]
+        phi_s = torch.einsum("nsh,nth->nts", [proj_s, emb])
         idxs = torch.arange(0, max(lens)).to(lens.device)
         # mask: N x R x 1
         mask = (idxs.repeat(len(lens), 1) >= lens.unsqueeze(-1))
-        phi_s[:,:,-1].masked_fill_(1-mask, float("-inf"))
-        phi_s[:,:,:3].masked_fill_(mask.unsqueeze(-1), float("-inf"))
-        #"""
-        """
-        h = (h
-            .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
-            .permute(1, 0, 2)
-            .contiguous()
-            .view(-1, 2 * self.rnn_sz))
-        phi_y = self.proj_y(h)
-        """
-        phi_y = torch.zeros(N, len(self.S)).to(self.psi_ys.device)
-        psi_ys = torch.cat(
-            [torch.diag(self.psi_ys), torch.zeros(len(self.S), 1).to(self.psi_ys)],
-            dim=-1,
-        )
-        psi_ys0 = psi_ys[y]
-        return phi_s + psi_ys0
+        phi_y = torch.zeros(N, len(self.S)).to(self.lut.weight.device)
+        psi_ys = self.proj_ys(x).view(N, T, len(self.S)-1, len(self.S)-1)
+        left = torch.zeros(N, T, 1, len(self.S)-1).to(psi_ys)
+        top = torch.cat(
+            [self.psi_none, torch.zeros(len(self.S)-1).to(psi_ys)],
+            0,
+        ).view(1,1,len(self.S),1).expand(N,T,len(self.S),1)
+        psi_ys = torch.cat([top, torch.cat([left, psi_ys], -2)], -1)
+        # mask phi_s, psi_ys...actually these are mostly unnecessary
+        phi_s.masked_fill_(mask.unsqueeze(-1), 0) 
+        psi_ys = psi_ys.masked_fill_(mask.view(N, T, 1, 1), 0)
+        psi_ys0 = psi_ys.gather(2, y.view(N,1,1,1).expand(N,T,1,len(self.S))).squeeze(-2)
+        return phi_s + psi_ys0, psi_ys

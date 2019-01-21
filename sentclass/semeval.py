@@ -54,10 +54,10 @@ def make_fields():
         #lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
     return TEXT, None, ASPECT, SENTIMENT
 
-def build_vocab(f1, f2, f3, d1, d2):
-    f1.build_vocab(d1, d2)
-    f2.build_vocab(d1, d2)
-    f3.build_vocab(d1, d2)
+def build_vocab(f1, f2, f3, d1, d2, d3):
+    f1.build_vocab(d1, d2, d3)
+    f2.build_vocab(d1, d2, d3)
+    f3.build_vocab(d1, d2, d3)
 
 
 class SemevalExample(Example):
@@ -275,7 +275,26 @@ def pool(pos, neg, none, batch_size, key, batch_size_fn=lambda new, count, sofar
     for p in batch(data3, batch_size / 3, batch_size_fn):
         yield sorted([x for y in p for x in y], key=key)
 
+
+RATIO = 0.1
+def grab_valid(path, train):
+    import numpy as np
+    fp = os.path.join(path, train)
+    tp = os.path.join(path, train + ".train")
+    vp = os.path.join(path, train + ".valid")
+    with open(fp, "r") as f, open(tp, "w") as t, open(vp, "w") as v:
+        train = json.load(f)
+        N = len(train)
+        perm = np.random.permutation(N)
+        cutoff = int(N*RATIO)
+        train_data = [train[i] for i in perm[:-cutoff]]
+        valid_data = [train[i] for i in perm[-cutoff:]]
+        json.dump(train_data, t)
+        json.dump(valid_data, v)
+
+
 if __name__ == "__main__":
+    """
     filepath = "/n/rush_lab/jc/code/sentclass/data"
     filepath = "~/research/GCAE/acsa-restaurant-2014"
     TEXT, ASPECT, SENTIMENT = make_fields()
@@ -300,3 +319,8 @@ if __name__ == "__main__":
     )
     batch = next(iter(train_iter))
     import pdb; pdb.set_trace()
+    """
+
+    filepath = "/n/home13/jchiu/research/GCAE/acsa-restaurant-large"
+    train = "acsa_train.json"
+    grab_valid(filepath, train)

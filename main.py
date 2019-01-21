@@ -1,7 +1,12 @@
 # python main.py --devid 2 --bsz 150 --ebsz 150 --rnn-sz 100 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.5 \
-# --epochs 5000 --model boring
+# --epochs 5000 --model boring --once
 # python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000 \
-# --model crfnb --flat-data
+# --model crfnb --flat-data --once
+#
+#
+# NEW AND BETTER
+# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model boring
+# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model crfnb
  
 import argparse
 
@@ -13,6 +18,8 @@ from torchtext.vocab import GloVe
 
 from sentclass.models.boring import Boring
 from sentclass.models.crfnb import CrfNb
+from sentclass.models.crfnb1 import CrfNb1
+from sentclass.models.crfnb2 import CrfNb2
 from sentclass.models.crfsimple import CrfSimple
 
 import json
@@ -25,8 +32,8 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--filepath",
-        #default="data",
-        default="~/research/GCAE/acsa-restaurant-large",
+        default="data",
+        #default="~/research/GCAE/acsa-restaurant-large",
         #default="~/research/GCAE/acsa-restaurant-2014",
         type=str,
     )
@@ -39,6 +46,7 @@ def get_args():
     parser.add_argument("--bsz", default=48, type=int)
     parser.add_argument("--ebsz", default=48, type=int)
     parser.add_argument("--epochs", default=32, type=int)
+    parser.add_argument("--once", action="store_true")
 
     parser.add_argument("--clip", default=5, type=float)
     parser.add_argument("--lr", default=0.01, type=float)
@@ -63,7 +71,7 @@ def get_args():
     # Model
     parser.add_argument(
         "--model",
-        choices=["boring", "crfnb", "crfsimple"],
+        choices=["boring", "crfnb", "crfnb1", "crfnb2"],
         default="boring"
     )
 
@@ -90,71 +98,50 @@ torch.cuda.manual_seed(args.seed)
 device = torch.device(f"cuda:{args.devid}" if args.devid >= 0 else "cpu")
 
 # Data
-"""
-if args.data == "sentihood":
-    import sentclass.sentihood as data
-    from sentclass.sentihood import RandomIterator
-
-    TEXT, LOCATION, ASPECT, SENTIMENT = data.make_fields()
-    train, valid, test = data.SentihoodDataset.splits(
-        TEXT, LOCATION, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath)
-
-    data.build_vocab(TEXT, LOCATION, ASPECT, SENTIMENT, train, valid, test)
-    TEXT.vocab.load_vectors(vectors=GloVe(name="42B"))
-    TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
-        (TEXT.vocab.vectors[TEXT.vocab.stoi["transit"]] +
-            TEXT.vocab.vectors[TEXT.vocab.stoi["location"]]) / 2
-    )
-
-    iterator = BucketIterator if not args.flat_data else RandomIterator
-    asp_iterator = BucketIterator
-
-    train_iter, valid_iter, test_iter = iterator.splits(
-        (train, valid, test),
-        batch_sizes = (args.bsz, args.ebsz, args.ebsz),
-        device = device,
-        repeat = False,
-        sort_within_batch = True,
-        #sort_key = already given in dataset?
-    )
-    full_train_iter = RandomIterator(
-        dataset = train,
-        batch_size = args.ebsz,
-        device = device,
-        repeat = False,
-        sort_within_batch = True,
-        train = False,
-    )
-    asp_train_iter, asp_valid_iter, asp_test_iter = asp_iterator.splits(
-        (asp_train, asp_valid, asp_test),
-        batch_size = args.ebsz,
-        device = device,
-        repeat = False,
-        sort_within_batch = True,
-    )
-    #import pdb; pdb.set_trace()
-elif args.data == "semeval":
-    """
-import sentclass.semeval as data
+import sentclass.sentihood as data
+from sentclass.sentihood import RandomIterator
 
 TEXT, LOCATION, ASPECT, SENTIMENT = data.make_fields()
-train, test = data.SemevalDataset.splits(
-    TEXT, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath,
-    #train="acsa_hard_train.json", test="acsa_hard_test.json",
-    train="acsa_train.json", test="acsa_test.json",
-)
-data.build_vocab(TEXT, ASPECT, SENTIMENT, train, test)
-TEXT.vocab.load_vectors(vectors=GloVe(name="840B"))
+train, valid, test = data.SentihoodDataset.splits(
+    TEXT, LOCATION, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath)
 
-train_iter, valid_iter = BucketIterator.splits(
-    (train, test),
+data.build_vocab(TEXT, LOCATION, ASPECT, SENTIMENT, train, valid, test)
+TEXT.vocab.load_vectors(vectors=GloVe(name="840B"))
+TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
+    (TEXT.vocab.vectors[TEXT.vocab.stoi["transit"]] +
+        TEXT.vocab.vectors[TEXT.vocab.stoi["location"]]) / 2
+)
+
+iterator = BucketIterator if not args.flat_data else RandomIterator
+
+train_iter, valid_iter, test_iter = iterator.splits(
+    (train, valid, test),
     batch_sizes = (args.bsz, args.ebsz, args.ebsz),
     device = device,
     repeat = False,
     sort_within_batch = True,
     #sort_key = already given in dataset?
 )
-full_train_iter = train_iter
+full_train_iter = RandomIterator(
+    dataset = train,
+    batch_size = args.ebsz,
+    device = device,
+    repeat = False,
+    sort_within_batch = True,
+    train = False,
+)
+
+asp_iterator = BucketIterator
+asp_train, asp_valid, asp_test = data.SentihoodDataset.splits(
+    TEXT, LOCATION, ASPECT, SENTIMENT, flat=False, path=args.filepath)
+asp_train_iter, asp_valid_iter, asp_test_iter = asp_iterator.splits(
+    (asp_train, asp_valid, asp_test),
+    batch_size = args.ebsz,
+    device = device,
+    repeat = False,
+    sort_within_batch = True,
+)
+#import pdb; pdb.set_trace()
 
 # Model
 if args.model == "boring":
@@ -170,9 +157,35 @@ if args.model == "boring":
         dp      = args.dp,
         tieweights = args.tieweights,
     )
-if args.model == "crfnb":
+elif args.model == "crfnb":
     assert(args.flat_data)
     model = CrfNb(
+        V       = TEXT.vocab,
+        L       = LOCATION.vocab if LOCATION is not None else None,
+        A       = ASPECT.vocab,
+        S       = SENTIMENT.vocab,
+        emb_sz  = args.emb_sz,
+        rnn_sz  = args.rnn_sz,
+        nlayers = args.nlayers,
+        dp      = args.dp,
+        tieweights = args.tieweights,
+    )
+elif args.model == "crfnb1":
+    assert(args.flat_data)
+    model = CrfNb1(
+        V       = TEXT.vocab,
+        L       = LOCATION.vocab if LOCATION is not None else None,
+        A       = ASPECT.vocab,
+        S       = SENTIMENT.vocab,
+        emb_sz  = args.emb_sz,
+        rnn_sz  = args.rnn_sz,
+        nlayers = args.nlayers,
+        dp      = args.dp,
+        tieweights = args.tieweights,
+    )
+elif args.model == "crfnb2":
+    assert(args.flat_data)
+    model = CrfNb2(
         V       = TEXT.vocab,
         L       = LOCATION.vocab if LOCATION is not None else None,
         A       = ASPECT.vocab,
@@ -205,10 +218,10 @@ optimizer = optim.Adam(
 schedule = optim.lr_scheduler.ReduceLROnPlateau(
     optimizer, patience=args.pat, factor=args.lrd, threshold=1e-3)
 
-best_val = float("inf")
+best_val = 0
 for e in range(args.epochs):
     print(f"Epoch {e} lr {optimizer.param_groups[0]['lr']}")
-    #train_iter.init_epoch()
+    train_iter.init_epoch()
     #print(" ".join([TEXT.vocab.itos[x] for x in next(iter(train_iter)).text[0][0].tolist()]))
     # Train
     train_loss, tntok = model.train_epoch(
@@ -216,6 +229,7 @@ for e in range(args.epochs):
         clip      = args.clip,
         re        = args.re,
         optimizer = optimizer,
+        once      = args.once,
     )
 
     # Validate
@@ -227,17 +241,19 @@ for e in range(args.epochs):
     train_acc = model.acc(full_train_iter)
     #train_acc = 0
     # Accuracy on Valid
-    valid_acc = model.acc(valid_iter)
-
-    #valid_f1 = model.f1(asp_valid_iter)
-    valid_f1 = 0
+    valid_acc = model.acc(valid_iter, skip0=True)
+    valid_f1 = model.f1(asp_valid_iter)
+    #valid_f1 = 0
+    test_acc = model.acc(test_iter, skip0=True)
+    test_f1 = model.f1(asp_test_iter)
 
     # Report
     print(f"Epoch {e}")
     print(f"train loss: {train_loss / tntok} train acc: {train_acc}")
     print(f"valid loss: {valid_loss / ntok} valid acc: {valid_acc} valid f1: {valid_f1}")
+    print(f"test acc: {test_acc} test f1: {test_f1}")
 
-    if args.save and valid_loss < best_val:
-        best_val = valid_loss
-        savestring = f"{args.model}-lr{args.lr}-dp{args.dp}-tw{args.tieweights}-if{args.inputfeed}.pt"
+    if args.save and valid_acc > best_val:
+        best_val = valid_acc
+        savestring = f"saves/{args.model}/{args.model}-lr{args.lr}-nl{args.nlayers}-rnnsz{args.rnn_sz}-dp{args.dp}-va{valid_acc}-vf{valid_f1}-ta{test_acc}-tf{test_f1}.pt"
         torch.save(model, savestring)

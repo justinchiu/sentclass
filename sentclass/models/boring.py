@@ -65,6 +65,12 @@ class Boring(Sent):
             #out_features = len(S),
             bias = True,
         )
+        
+        #import torch.nn.init
+        #for p in self.parameters():
+        #    if p.requires_grad and p.dim() == 2:
+        #        torch.nn.init.xavier_uniform_(p)
+
 
     def forward(self, x, lens, k, kx):
         # model takes as input the text, aspect, and location
@@ -93,11 +99,12 @@ class Boring(Sent):
             .permute(1, 0, 2)
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
+        h = self.drop(h)
         #import pdb; pdb.set_trace()
         ok = self.proj(h).view(N, len(self.A), len(self.S))
         return ok[:,0,:]
-        #lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
-        #return lol.squeeze(1)
+        ##lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
+        ##return lol.squeeze(1)
         #return self.proj(h)
         # when there was a different sentiment rep for each l, a
         #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
@@ -117,3 +124,21 @@ class Boring(Sent):
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
         return self.proj(y).view(-1, Ys[0], Ys[1], Ys[2])
+
+    def observe(self, x, lens, l, a, y):
+        emb = self.drop(self.lut(x))
+        p_emb = pack(emb, lens, True)
+
+        N = a.shape[0]
+        # factor this out, for sure. POSSIBLE BUGS
+        y_idx = l * len(self.A) + a if self.L is not None else a
+        #y_idx = a
+        s = (self.lut_la(y_idx)
+            .view(N, 2, 2 * self.nlayers, self.rnn_sz)
+            .permute(1, 2, 0, 3)
+            .contiguous())
+        state = (s[0], s[1])
+        x, (h, c) = self.rnn(p_emb, state)
+        ok = self.proj(unpack(x, True)[0]).view(N, -1, len(self.A), len(self.S))
+        return ok[:,:,0,:]
+

@@ -82,9 +82,10 @@ def make_fields():
     SENTIMENT = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
     LOCATION = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
     ASPECT = Field(lower=True, is_target=True, unk_token=None, pad_token=None, batch_first=True)
-    TEXT = Field(
-        lower=True, include_lengths=True, is_target=True, batch_first=True)
-        #lower=True, include_lengths=True, init_token="<bos>", eos_token="<eos>", is_target=True)
+    TEXT = Field(tokenize="spacy",
+        #lower=False, include_lengths=True, is_target=True, batch_first=True, init_token="<bos>", eos_token="<eos>")
+        lower=True, include_lengths=True, is_target=True, batch_first=True, init_token="<bos>", eos_token="<eos>")
+        #lower=True, include_lengths=True, batch_first=True, is_target=True)
     return TEXT, LOCATION, ASPECT, SENTIMENT
 
 def build_vocab(f1, f2, f3, f4, d1, d2, d3):

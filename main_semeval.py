@@ -90,16 +90,16 @@ device = torch.device(f"cuda:{args.devid}" if args.devid >= 0 else "cpu")
 import sentclass.semeval as data
 
 TEXT, LOCATION, ASPECT, SENTIMENT = data.make_fields()
-train, test = data.SemevalDataset.splits(
+train, valid, test = data.SemevalDataset.splits(
     TEXT, ASPECT, SENTIMENT, flat=args.flat_data, path=args.filepath,
     #train="acsa_hard_train.json", test="acsa_hard_test.json",
-    train="acsa_train.json", test="acsa_test.json",
+    train="acsa_train.json.train", validation="acsa_train.json.valid", test="acsa_test.json",
 )
-data.build_vocab(TEXT, ASPECT, SENTIMENT, train, test)
+data.build_vocab(TEXT, ASPECT, SENTIMENT, train, valid, test)
 TEXT.vocab.load_vectors(vectors=GloVe(name="840B"))
 
-train_iter, valid_iter = BucketIterator.splits(
-    (train, test),
+train_iter, valid_iter, test_iter = BucketIterator.splits(
+    (train, valid, test),
     batch_sizes = (args.bsz, args.ebsz, args.ebsz),
     device = device,
     repeat = False,
@@ -183,11 +183,13 @@ for e in range(args.epochs):
 
     #valid_f1 = model.f1(asp_valid_iter)
     valid_f1 = 0
+    test_acc = model.acc(test_iter)
 
     # Report
     print(f"Epoch {e}")
     print(f"train loss: {train_loss / tntok} train acc: {train_acc}")
-    print(f"valid loss: {valid_loss / ntok} valid acc: {valid_acc} valid f1: {valid_f1}")
+    print(f"valid loss: {valid_loss / ntok} valid acc: {valid_acc}")
+    print(f"test acc: {test_acc}")
 
     if args.save and valid_loss < best_val:
         best_val = valid_loss
