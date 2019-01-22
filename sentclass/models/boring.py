@@ -82,7 +82,7 @@ class Boring(Sent):
 
         l, a = k
         N = a.shape[0]
-        # factor this out, for sure. POSSIBLE BUGS
+
         y_idx = l * len(self.A) + a if self.L is not None else a
         #y_idx = a
         s = (self.lut_la(y_idx)
@@ -92,7 +92,6 @@ class Boring(Sent):
         state = (s[0], s[1])
         x, (h, c) = self.rnn(p_emb, state)
         # h: L * D x N x H
-        #x = unpack(x, True)[0]
         # Get the last hidden states for both directions, POSSIBLE BUGS
         h = (h
             .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
@@ -100,37 +99,16 @@ class Boring(Sent):
             .contiguous()
             .view(-1, 2 * self.rnn_sz))
         h = self.drop(h)
-        #import pdb; pdb.set_trace()
         ok = self.proj(h).view(N, len(self.A), len(self.S))
         return ok[:,0,:]
-        ##lol = ok.gather(1, a.view(N, 1, 1).expand(N, 1, len(self.S)))
-        ##return lol.squeeze(1)
-        #return self.proj(h)
-        # when there was a different sentiment rep for each l, a
-        #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
-        #return torch.einsum("nyh,nh->ny", [z, h])
 
-    def _old_forward(self, x, lens, k):
-        emb = self.drop(self.lut(x))
-        p_emb = pack(emb, lens, True)
-        x, (h, c) = self.rnn(p_emb)
-        # h: L * D x N x H
-        x = unpack(x, True)[0]
-        # y: N x D * H
-        #h = h+c
-        y = (h
-            .view(self.nlayers, 2, -1, self.rnn_sz)[-1]
-            .permute(1, 0, 2)
-            .contiguous()
-            .view(-1, 2 * self.rnn_sz))
-        return self.proj(y).view(-1, Ys[0], Ys[1], Ys[2])
 
     def observe(self, x, lens, l, a, y):
         emb = self.drop(self.lut(x))
         p_emb = pack(emb, lens, True)
 
         N = a.shape[0]
-        # factor this out, for sure. POSSIBLE BUGS
+
         y_idx = l * len(self.A) + a if self.L is not None else a
         #y_idx = a
         s = (self.lut_la(y_idx)

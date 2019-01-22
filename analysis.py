@@ -44,7 +44,64 @@ f = lambda num: f"{num:0.2f}"
 # valid locations: 148
 # valid wtf: 153, 188, 219
 # both bad: 215
+ 
+print("===== Hand-crafted example for paper =====")
 
+t0 = "location1 is a great place to live but not too convenient".split()
+x, lens = TEXT.process([t0])
+a = torch.LongTensor([[0]])
+l = torch.LongTensor([[0]])
+y = torch.LongTensor([[1]])
+s0, psi_ys0 = crfnb1.observe(x, lens, l, a, y)
+ss0 = torch.softmax(s0, -1)
+sy0 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+ok0 = list(zip(["<bos>"] + t0 + ["<eos>"], ss0[0].tolist(), psi_ys0[0,:,1:,1:].transpose(-1,-2).tolist()))
+print("Positive sentiment, general")
+for w, x, y in ok0:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
+print()
+
+t0 = "location1 is a great place to live but not too convenient".split()
+x, lens = TEXT.process([t0])
+a = torch.LongTensor([[3]])
+l = torch.LongTensor([[0]])
+y = torch.LongTensor([[2]])
+s0, psi_ys0 = crfnb1.observe(x, lens, l, a, y)
+ss0 = torch.softmax(s0, -1)
+sy0 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+ok0 = list(zip(["<bos>"] + t0 + ["<eos>"], ss0[0].tolist(), psi_ys0[0,:,1:,1:].transpose(-1,-2).tolist()))
+print("Negative sentiment, transit-location")
+for w, x, y in ok0:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
+print()
+import pdb; pdb.set_trace()
+
+#t0 = ["she", "liked", "location1", "but", "others", "said", "it", "'s", "rough"]
+x, lens = TEXT.process([t0])
+a = torch.LongTensor([[0]])
+l = torch.LongTensor([[0]])
+y = torch.LongTensor([[1]])
+s0, psi_ys0 = crfnb1.observe(x, lens, l, a, y)
+ss0 = torch.softmax(s0, -1)
+sy0 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+ok0 = list(zip(["<bos>"] + t0 + ["<eos>"], ss0[0].tolist(), psi_ys0[0,:,1:,1:].transpose(-1,-2).tolist()))
+print("Positive sentiment")
+for w, x, y in ok0:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
+print()
+
+x, lens = TEXT.process([t0])
+a = torch.LongTensor([[2]])
+y = torch.LongTensor([[2]])
+s02, psi_ys02 = crfnb1.observe(x, lens, l, a, y)
+ss02 = torch.softmax(s02, -1)
+sy02 = torch.softmax(crfnb1(x, lens, [l,a], [l,a]), -1)
+ok02 = list(zip(["<bos>"] + t0 + ["<eos>"], ss02[0].tolist(), psi_ys02[0,:,1:,1:].transpose(-1,-2).tolist()))
+for w, x, y in ok02:
+    print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t{y}")
+print()
+
+import pdb; pdb.set_trace()
  
 print("===== Hand-crafted experiment for negation =====")
 

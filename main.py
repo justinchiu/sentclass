@@ -20,7 +20,7 @@ from sentclass.models.boring import Boring
 from sentclass.models.crfnb import CrfNb
 from sentclass.models.crfnb1 import CrfNb1
 from sentclass.models.crfnb2 import CrfNb2
-from sentclass.models.crfsimple import CrfSimple
+from sentclass.models.crfneg import CrfNeg
 
 import json
 
@@ -71,7 +71,7 @@ def get_args():
     # Model
     parser.add_argument(
         "--model",
-        choices=["boring", "crfnb", "crfnb1", "crfnb2"],
+        choices=["boring", "crfnb", "crfnb1", "crfnb2", "crfneg"],
         default="boring"
     )
 
@@ -186,6 +186,19 @@ elif args.model == "crfnb1":
 elif args.model == "crfnb2":
     assert(args.flat_data)
     model = CrfNb2(
+        V       = TEXT.vocab,
+        L       = LOCATION.vocab if LOCATION is not None else None,
+        A       = ASPECT.vocab,
+        S       = SENTIMENT.vocab,
+        emb_sz  = args.emb_sz,
+        rnn_sz  = args.rnn_sz,
+        nlayers = args.nlayers,
+        dp      = args.dp,
+        tieweights = args.tieweights,
+    )
+elif args.model == "crfneg":
+    assert(args.flat_data)
+    model = CrfNeg(
         V       = TEXT.vocab,
         L       = LOCATION.vocab if LOCATION is not None else None,
         A       = ASPECT.vocab,

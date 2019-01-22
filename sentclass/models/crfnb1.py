@@ -93,7 +93,7 @@ class CrfNb1(Sent):
         l, a = k
         N = x.shape[0]
         T = x.shape[1]
-        # factor this out, for sure. POSSIBLE BUGS
+
         y_idx = l * len(self.A) + a if self.L is not None else a
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
@@ -121,33 +121,14 @@ class CrfNb1(Sent):
         phi_s.masked_fill_(mask.unsqueeze(-1), 0) 
         psi_ys = psi_ys.masked_fill_(mask.view(N, T, 1, 1), 0)
         Z, hy = ubersum("nts,ntys,ny->n,ny", phi_s, psi_ys, phi_y, batch_dims="t", modulo_total=True)
-        def stuff(i):
-            loc = self.L.itos[l[i]]
-            asp = self.A.itos[a[i]]
-            return self.tostr(words[i]), loc, asp, xp[i], yp[i]
-        if self.training:
-            self._N += 1
-        if self._N > 100 and self.training:
-            Zx, hx = ubersum("nts,ntys->nt,nts", phi_s, psi_ys, batch_dims="t", modulo_total=True)
-            xp = (hx - Zx.unsqueeze(-1)).exp()
-            yp = (hy - Z.unsqueeze(-1)).exp()
-            #Zx, hx = ubersum("nts,ys->nt,nts", phi_s, self.psi_ys, batch_dims="t")
-            #import pdb; pdb.set_trace()
-            pass
-            # text, loc, asp, xpi, ypi = stuff(10)
-        #import pdb; pdb.set_trace()
-        return hy# - Z.unsqueeze(-1)
-        # when there was a different sentiment rep for each l, a
-        #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
-        #return torch.einsum("nyh,nh->ny", [z, h])
-        #
+        return hy
+
     def observe(self, x, lens, l, a, y):
         emb = self.drop(self.lut(x))
         p_emb = pack(emb, lens, True)
 
         N = x.shape[0]
         T = x.shape[1]
-        # factor this out, for sure. POSSIBLE BUGS
         y_idx = l * len(self.A) + a if self.L is not None else a
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
