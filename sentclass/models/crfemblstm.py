@@ -8,7 +8,7 @@ from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 from pyro.ops.contract import ubersum
 
-class CrfNb1(Sent):
+class CrfEmbLstm(Sent):
     def __init__(
         self,
         V = None,
@@ -21,7 +21,7 @@ class CrfNb1(Sent):
         dp = 0.3,
         tieweights = True,
     ):
-        super(CrfNb1, self).__init__()
+        super(CrfEmbLstm, self).__init__()
 
         self._N = 0
 

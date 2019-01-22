@@ -1,12 +1,5 @@
-# python main.py --devid 2 --bsz 150 --ebsz 150 --rnn-sz 100 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.5 \
-# --epochs 5000 --model boring --once
-# python main.py --devid 1 --bsz 150 --ebsz 150 --rnn-sz 50 --lr 0.01 --dp 0.01 --nlayers 2 --clip 5 --lrd 0.5 --epochs 5000 \
-# --model crfnb --flat-data --once
-#
-#
-# NEW AND BETTER
-# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model boring
-# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model crfnb
+# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model lstmfinal
+# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model crfemblstm
  
 import argparse
 
@@ -16,10 +9,10 @@ import torch.optim as optim
 from torchtext.data import BucketIterator
 from torchtext.vocab import GloVe
 
-from sentclass.models.boring import Boring
-from sentclass.models.crfnb import CrfNb
-from sentclass.models.crfnb1 import CrfNb1
-from sentclass.models.crfnb2 import CrfNb2
+from sentclass.models.lstmfinal import LstmFinal
+from sentclass.models.crflstmdiag import CrfLstmDiag
+from sentclass.models.crfemblstm import CrfEmbLstm
+from sentclass.models.crflstmlstm import CrfLstmLstm
 from sentclass.models.crfneg import CrfNeg
 
 import json
@@ -71,8 +64,10 @@ def get_args():
     # Model
     parser.add_argument(
         "--model",
-        choices=["boring", "crfnb", "crfnb1", "crfnb2", "crfneg"],
-        default="boring"
+        choices=[
+            "lstmfinal", "crflstmdiag", "crfemblstm", "crflstmlstm", "crfneg",
+        ],
+        default="lstmfinal"
     )
 
     parser.add_argument("--nlayers", default=2, type=int)
@@ -144,9 +139,9 @@ asp_train_iter, asp_valid_iter, asp_test_iter = asp_iterator.splits(
 #import pdb; pdb.set_trace()
 
 # Model
-if args.model == "boring":
+if args.model == "lstmfinal":
     assert(args.flat_data)
-    model = Boring(
+    model = LstmFinal(
         V       = TEXT.vocab,
         L       = LOCATION.vocab if LOCATION is not None else None,
         A       = ASPECT.vocab,
@@ -157,9 +152,9 @@ if args.model == "boring":
         dp      = args.dp,
         tieweights = args.tieweights,
     )
-elif args.model == "crfnb":
+elif args.model == "crflstmdiag":
     assert(args.flat_data)
-    model = CrfNb(
+    model = CrfLstmDiag(
         V       = TEXT.vocab,
         L       = LOCATION.vocab if LOCATION is not None else None,
         A       = ASPECT.vocab,
@@ -170,9 +165,9 @@ elif args.model == "crfnb":
         dp      = args.dp,
         tieweights = args.tieweights,
     )
-elif args.model == "crfnb1":
+elif args.model == "CrfEmbLstm":
     assert(args.flat_data)
-    model = CrfNb1(
+    model = CrfEmbLstm(
         V       = TEXT.vocab,
         L       = LOCATION.vocab if LOCATION is not None else None,
         A       = ASPECT.vocab,
@@ -183,9 +178,9 @@ elif args.model == "crfnb1":
         dp      = args.dp,
         tieweights = args.tieweights,
     )
-elif args.model == "crfnb2":
+elif args.model == "CrfLstmLstm":
     assert(args.flat_data)
-    model = CrfNb2(
+    model = CrfLstmLstm(
         V       = TEXT.vocab,
         L       = LOCATION.vocab if LOCATION is not None else None,
         A       = ASPECT.vocab,
