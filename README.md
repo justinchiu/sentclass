@@ -1,5 +1,5 @@
 # SentClass
-Sentence classification on the Sentihood dataset.
+Sentence classification on the Sentihood dataset with a couple CRF models.
 
 ## Requirements
 Code is tested with [torch](https://github.com/pytorch/pytorch) 1.0.0, [pyro](https://github.com/uber/pyro) 0.3.0,
