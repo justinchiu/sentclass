@@ -1,14 +1,14 @@
 # SentClass
 Sentence classification on the Sentihood dataset.
 
-# Requirements
+## Requirements
 Code is tested with [torch](https://github.com/pytorch/pytorch) 1.0.0, [pyro](https://github.com/uber/pyro) 0.3.0,
 and [torchtext](https://github.com/pytorch/text) 0.4.0.
 
-# Data
+## Data
 Data was obtained from [jack](https://github.com/uclmr/jack/tree/master/data/sentihood).
 
-# Training
+## Training
 Run the models with the following command:
 ```
 python main.py --flat-data --model {lstmfinal | crflstmdiag | crflstmlstm | crfemblstm} {--save} {--devid #}
