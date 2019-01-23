@@ -66,17 +66,7 @@ class CrfLstmDiag(Sent):
             out_features = len(S) + 1,
             bias = False,
         )
-        #self.psi_ys = nn.Parameter(
-            #torch.randn(len(S), len(S)) + torch.eye(len(S))
-        #)
-        #self.theta = nn.Parameter(torch.FloatTensor([10]))
         self.psi_ys = nn.Parameter(torch.FloatTensor([0.1, 0.1, 0.1]))
-        #self.psi_ys.requires_grad = False
-        self.proj_y = nn.Linear(
-            in_features = 2 * rnn_sz,
-            out_features = len(S),
-            bias = False,
-        )
 
 
     def forward(self, x, lens, k, kx):

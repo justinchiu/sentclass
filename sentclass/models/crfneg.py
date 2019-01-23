@@ -75,12 +75,6 @@ class CrfNeg(Sent):
         self.flip.data[2,1] = 1
 
     def forward(self, x, lens, k, kx):
-        # model takes as input the text, aspect, and location
-        # runs BLSTM over text using embedding(location, aspect) as
-        # the initial hidden state, as opposed to a different lstm for every pair???
-        # output sentiment
-
-        # DBG
         words = x
 
         emb = self.drop(self.lut(x))
@@ -89,7 +83,6 @@ class CrfNeg(Sent):
         l, a = k
         N = x.shape[0]
         T = x.shape[1]
-        # factor this out, for sure. POSSIBLE BUGS
         y_idx = l * len(self.A) + a if self.L is not None else a
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
@@ -101,22 +94,17 @@ class CrfNeg(Sent):
         x = unpack(x, True)[0]
         proj_s = self.proj_s[y_idx.squeeze(-1)]
         phi_s = torch.einsum("nsh,nth->nts", [proj_s, emb])
-        #proj_neg = self.proj_neg[0].unsqueeze(0).expand(N, 2, 2*self.rnn_sz)
         proj_neg = self.proj_neg[y_idx.squeeze(-1)]
         phi_neg = torch.einsum("nbh,nth->ntb", [proj_neg, x])
 
-        #idxs = torch.arange(0, max(lens)).to(lens.device)
-        # mask: N x R x 1
-        #mask = (idxs.repeat(len(lens), 1) >= lens.unsqueeze(-1))
         phi_y = torch.zeros(N, len(self.S)).to(self.lut.weight.device)
         psi_ybs0 = torch.diag(self.psi_ys)
         psi_ybs1 = psi_ybs0 @ self.flip
         psi_ybs = (torch.stack([psi_ybs0, psi_ybs1], 1)
             .view(1, 1, len(self.S), 2, len(self.S))
             .repeat(N, T, 1, 1, 1))
-        # mask phi_s, psi_ys...actually these are mostly unnecessary
         idxs = torch.arange(0, max(lens)).to(lens.device)
-        # mask: N x R x 1
+        # mask: N x R
         mask = (idxs.repeat(len(lens), 1) >= lens.unsqueeze(-1))
         phi_s.masked_fill_(mask.unsqueeze(-1), 0)
         psi_ybs.masked_fill_(mask.view(N, T, 1, 1, 1).expand_as(psi_ybs), 0)
@@ -133,46 +121,8 @@ class CrfNeg(Sent):
                 asp = self.A.itos[a[i]]
                 return self.tostr(words[i]), loc, asp, xp[i], yp[i], bp[i]
             import pdb; pdb.set_trace()
-            pass
             # wordsi, loc, asp, xpi, ypi, bpi = stuff(10)
-        #import pdb; pdb.set_trace()
-        return hy# - Z.unsqueeze(-1)
-        # when there was a different sentiment rep for each l, a
-        #z = self.proj(y_idx.squeeze()).view(N, 3, 2*self.rnn_sz)
-        #return torch.einsum("nyh,nh->ny", [z, h])
-        #
+        return hy
+
     def observe(self, x, lens, l, a, y):
-        emb = self.drop(self.lut(x))
-        p_emb = pack(emb, lens, True)
-
-        N = x.shape[0]
-        T = x.shape[1]
-        # factor this out, for sure. POSSIBLE BUGS
-        y_idx = l * len(self.A) + a if self.L is not None else a
-        s = (self.lut_la(y_idx)
-            .view(N, 2, 2 * self.nlayers, self.rnn_sz)
-            .permute(1, 2, 0, 3)
-            .contiguous())
-        state = (s[0], s[1])
-        x, (h, c) = self.rnn(p_emb, state)
-        # h: L * D x N x H
-        x = unpack(x, True)[0]
-
-        proj_s = self.proj_s[y_idx.squeeze(-1)]
-        phi_s = torch.einsum("nsh,nth->nts", [proj_s, emb])
-        idxs = torch.arange(0, max(lens)).to(lens.device)
-        # mask: N x R x 1
-        mask = (idxs.repeat(len(lens), 1) >= lens.unsqueeze(-1))
-        phi_y = torch.zeros(N, len(self.S)).to(self.lut.weight.device)
-        psi_ys = self.proj_ys(x).view(N, T, len(self.S)-1, len(self.S)-1)
-        left = torch.zeros(N, T, 1, len(self.S)-1).to(psi_ys)
-        top = torch.cat(
-            [self.psi_none, torch.zeros(len(self.S)-1).to(psi_ys)],
-            0,
-        ).view(1,1,len(self.S),1).expand(N,T,len(self.S),1)
-        psi_ys = torch.cat([top, torch.cat([left, psi_ys], -2)], -1)
-        # mask phi_s, psi_ys...actually these are mostly unnecessary
-        phi_s.masked_fill_(mask.unsqueeze(-1), 0) 
-        psi_ys = psi_ys.masked_fill_(mask.view(N, T, 1, 1, 1), 0)
-        psi_ys0 = psi_ys.gather(2, y.view(N,1,1,1).expand(N,T,1,len(self.S))).squeeze(-2)
-        return phi_s + psi_ys0, psi_ys
+        raise NotImplementedError

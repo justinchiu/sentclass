@@ -83,7 +83,6 @@ class LstmFinal(Sent):
         N = a.shape[0]
 
         y_idx = l * len(self.A) + a if self.L is not None else a
-        #y_idx = a
         s = (self.lut_la(y_idx)
             .view(N, 2, 2 * self.nlayers, self.rnn_sz)
             .permute(1, 2, 0, 3)

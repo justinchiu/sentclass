@@ -39,12 +39,6 @@ TEXT.vocab.vectors[TEXT.vocab.stoi["transit-location"]] = (
 
 f = lambda num: f"{num:0.2f}"
 
-# [77, 81+83, 84!]
-# valid: 77, 83!, 84, 120?, 147??, 193?
-# valid locations: 148
-# valid wtf: 153, 188, 219
-# both bad: 215
- 
 print("===== Hand-crafted example for paper =====")
 
 t0 = "location1 is a great place to live but not too convenient".split()
@@ -211,9 +205,6 @@ print("## model comparison ##")
 for w, x, y, a, z, p in ok:
     print(f"{w:<10}:\t[{' '.join(map(f, x))}]\t[{' '.join(map(f, y))}]\t[{' '.join(map(f, a))}]\t[{' '.join(map(f, z))}]")
 print()
-#print("## conditional || unary || interaction matrix ##")
-#for w, x, y, a, z, p in ok:
-    #print(f"{w:<10}:\t[{' '.join(map(f, z))}]\t{p}")
 
 import pdb; pdb.set_trace()
 print("===== Comparisons on valid between models =====")

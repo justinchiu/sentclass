@@ -38,19 +38,16 @@ class Sent(nn.Module):
                 k = [l, a]
                 kx = [lx, ax]
 
-                # N x l x a x y, now N x y for dealing w imbalance
+                # N x y for dealing w imbalance
                 logits = self(x, lens, k, kx)
 
                 nll = self.loss(logits, y)
-                #import pdb; pdb.set_trace()
                 nelbo = nll
                 N = y.shape[0]
                 if learn:
                     nelbo.div(N).backward()
                     if clip > 0:
                         gnorm = clip_(self.parameters(), clip)
-                        #for param in self.rnn_parameters():
-                            #gnorm = clip_(param, clip)
                     optimizer.step()
                 cum_loss += nelbo.item()
                 cum_ntokens += N
@@ -60,7 +57,6 @@ class Sent(nn.Module):
                     titer.set_postfix(loss = batch_loss / batch_ntokens, gnorm = gnorm)
                     batch_loss = 0
                     batch_ntokens = 0
-        #print(f"train n: {cum_ntokens}")
         return cum_loss, cum_ntokens
 
     def train_epoch(self, diter, optimizer, clip=0, re=None, once=False):
@@ -81,11 +77,9 @@ class Sent(nn.Module):
         raise NotImplementedError
 
     def loss(self, logits, y):
-        #N = y.shape
         yflat = y.view(-1, 1)
         return -(F.log_softmax(logits, dim=-1)
-            #.view(-1, logits.shape[-1])
-            .gather(-1, yflat)#[yflat != 1]
+            .gather(-1, yflat)
             .sum())
 
     def acc(self, iter, skip0=False):
@@ -113,10 +107,7 @@ class Sent(nn.Module):
                 # N x l x a x y
                 logits = self(x, lens, k, kx)
                 _, hy = logits.view(N, -1, len(self.S)).max(-1)
-                #y = y.view(N, 2, -1)
 
-                #hy = hy[:,:,:4]
-                #y = y[:,:,:4]
                 if skip0:
                     correct += (hy[y != 0] == y[y!=0]).sum().item()
                     total += y[y!=0].nelement()
@@ -124,11 +115,6 @@ class Sent(nn.Module):
                     correct += (hy == y).sum().item()
                     total += y.nelement()
                 ftotal += y.nelement()
-                #import pdb; pdb.set_trace()
-                #if self._N > 10:
-                    #import pdb; pdb.set_trace()
-        print(f"acc total y!=0: {total}")
-        #print(f"acc total: {ftotal}")
         return correct / total
 
     def f1(self, iter):
