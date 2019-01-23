@@ -19,7 +19,6 @@ class CrfLstmLstm(Sent):
         rnn_sz = 256,
         nlayers = 2,
         dp = 0.3,
-        tieweights = True,
     ):
         super(CrfLstmLstm, self).__init__()
 

@@ -1,5 +1,3 @@
-# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model lstmfinal
-# python main.py --devid 3 --bsz 33 --ebsz 33 --rnn-sz 50 --lr 0.01 --dp 0.2 --flat-data --nlayers 2 --clip 5 --lrd 0.8 --epochs 1000 --model crfemblstm
  
 import argparse
 
@@ -17,8 +15,6 @@ from sentclass.models.crfneg import CrfNeg
 
 import json
 
-#torch.set_anomaly_enabled(True)
-#torch.backends.cudnn.enabled = False
 torch.backends.cudnn.enabled = True
 
 def get_args():
@@ -26,26 +22,24 @@ def get_args():
     parser.add_argument(
         "--filepath",
         default="data",
-        #default="~/research/GCAE/acsa-restaurant-large",
-        #default="~/research/GCAE/acsa-restaurant-2014",
         type=str,
     )
 
     parser.add_argument("--devid", default=-1, type=int)
 
     parser.add_argument("--flat-data", action="store_true", default=False)
-    parser.add_argument("--data", choices=["sentihood", "semeval"]) # use acsa vs atsa? lol same shit
+    parser.add_argument("--data", choices=["sentihood",]) 
 
-    parser.add_argument("--bsz", default=48, type=int)
-    parser.add_argument("--ebsz", default=48, type=int)
-    parser.add_argument("--epochs", default=32, type=int)
+    parser.add_argument("--bsz", default=33, type=int)
+    parser.add_argument("--ebsz", default=150, type=int)
+    parser.add_argument("--epochs", default=1000, type=int)
     parser.add_argument("--once", action="store_true")
 
     parser.add_argument("--clip", default=5, type=float)
     parser.add_argument("--lr", default=0.01, type=float)
-    parser.add_argument("--lrd", default=0.3, type=float)
+    parser.add_argument("--lrd", default=1, type=float)
     parser.add_argument("--pat", default=0, type=int)
-    parser.add_argument("--dp", default=0.1, type=float)
+    parser.add_argument("--dp", default=0.2, type=float)
     parser.add_argument("--wdp", default=0, type=float)
     parser.add_argument("--wd", default=1e-4, type=float)
 
@@ -73,8 +67,6 @@ def get_args():
     parser.add_argument("--nlayers", default=2, type=int)
     parser.add_argument("--emb-sz", default=300, type=int)
     parser.add_argument("--rnn-sz", default=50, type=int)
-
-    parser.add_argument("--tieweights", action="store_true", default=False)
 
     parser.add_argument("--save", action="store_true")
 
@@ -115,7 +107,6 @@ train_iter, valid_iter, test_iter = iterator.splits(
     device = device,
     repeat = False,
     sort_within_batch = True,
-    #sort_key = already given in dataset?
 )
 full_train_iter = RandomIterator(
     dataset = train,
@@ -136,7 +127,6 @@ asp_train_iter, asp_valid_iter, asp_test_iter = asp_iterator.splits(
     repeat = False,
     sort_within_batch = True,
 )
-#import pdb; pdb.set_trace()
 
 # Model
 if args.model == "lstmfinal":
@@ -150,7 +140,6 @@ if args.model == "lstmfinal":
         rnn_sz  = args.rnn_sz,
         nlayers = args.nlayers,
         dp      = args.dp,
-        tieweights = args.tieweights,
     )
 elif args.model == "crflstmdiag":
     assert(args.flat_data)
@@ -163,9 +152,8 @@ elif args.model == "crflstmdiag":
         rnn_sz  = args.rnn_sz,
         nlayers = args.nlayers,
         dp      = args.dp,
-        tieweights = args.tieweights,
     )
-elif args.model == "CrfEmbLstm":
+elif args.model == "crfemblstm":
     assert(args.flat_data)
     model = CrfEmbLstm(
         V       = TEXT.vocab,
@@ -176,9 +164,8 @@ elif args.model == "CrfEmbLstm":
         rnn_sz  = args.rnn_sz,
         nlayers = args.nlayers,
         dp      = args.dp,
-        tieweights = args.tieweights,
     )
-elif args.model == "CrfLstmLstm":
+elif args.model == "crflstmlstm":
     assert(args.flat_data)
     model = CrfLstmLstm(
         V       = TEXT.vocab,
@@ -189,7 +176,6 @@ elif args.model == "CrfLstmLstm":
         rnn_sz  = args.rnn_sz,
         nlayers = args.nlayers,
         dp      = args.dp,
-        tieweights = args.tieweights,
     )
 elif args.model == "crfneg":
     assert(args.flat_data)
@@ -223,14 +209,11 @@ params = list(model.parameters())
 
 optimizer = optim.Adam(
     params, lr = args.lr, weight_decay = args.wd, betas=(args.b1, args.b2))
-schedule = optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, patience=args.pat, factor=args.lrd, threshold=1e-3)
 
 best_val = 0
 for e in range(args.epochs):
     print(f"Epoch {e} lr {optimizer.param_groups[0]['lr']}")
     train_iter.init_epoch()
-    #print(" ".join([TEXT.vocab.itos[x] for x in next(iter(train_iter)).text[0][0].tolist()]))
     # Train
     train_loss, tntok = model.train_epoch(
         diter     = train_iter,
@@ -242,16 +225,12 @@ for e in range(args.epochs):
 
     # Validate
     valid_loss, ntok = model.validate(valid_iter)
-    # No schedule...dataset too small and gradients too noisy
-    #schedule.step(valid_loss / ntok)
 
     # Accuracy on train
     train_acc = model.acc(full_train_iter)
-    #train_acc = 0
     # Accuracy on Valid
     valid_acc = model.acc(valid_iter, skip0=True)
     valid_f1 = model.f1(asp_valid_iter)
-    #valid_f1 = 0
     test_acc = model.acc(test_iter, skip0=True)
     test_f1 = model.f1(asp_test_iter)
 
