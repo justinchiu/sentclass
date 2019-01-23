@@ -306,28 +306,5 @@ def pool(pos, neg, none, batch_size, key, batch_size_fn=lambda new, count, sofar
     if random_shuffler is None:
         random_shuffler = random.shuffle
     data3 = zip(random_shuffler(pos), random_shuffler(neg), random_shuffler(none))
-    """
-    data = [
-        x
-        for y in zip(random_shuffler(pos), random_shuffler(neg), random_shuffler(none))
-        for x in y
-    ]
-    """
     for p in batch(data3, batch_size / 3, batch_size_fn):
         yield sorted([x for y in p for x in y], key=key)
-
-if __name__ == "__main__":
-    filepath = "/n/rush_lab/jc/code/sentclass/data"
-    TEXT, LOCATION, ASPECT, SENTIMENT = make_fields()
-
-    train, valid, test = SentihoodDataset.splits(
-        TEXT, LOCATION, ASPECT, SENTIMENT, path=filepath
-    )
-    TEXT.build_vocab(train)
-    SENTIMENT.build_vocab(train)
-
-    train_iter, valid_iter, test_iter = data.BucketIterator.splits(
-        (train, valid, test), batch_size=32, device=torch.device("cuda:0")
-    )
-    batch = next(iter(train_iter))
-    import pdb; pdb.set_trace()
