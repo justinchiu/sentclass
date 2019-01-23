@@ -9,3 +9,6 @@ python main.py --flat-data --model {lstmfinal | crflstmdiag | crflstmlstm | crfe
 Add the `--save` option to save checkpoints along with their valid and test performance.
 Models are saved based on validation accuracy.
 Use the `--devid #` option to utilize a GPU.
+
+# Data
+Data was obtained from [jack](https://github.com/uclmr/jack/tree/master/data/sentihood).
