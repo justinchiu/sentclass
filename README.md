@@ -14,6 +14,7 @@ Run the models with the following command:
 python main.py --flat-data --model {lstmfinal | crflstmdiag | crflstmlstm | crfemblstm} {--save} {--devid #}
 ```
 Add the `--save` option to save checkpoints along with their valid and test performance.
+Be sure to create the `save/{modelname}` directory before saving.
 Models are saved based on validation accuracy.
 Use the `--devid #` option to utilize a GPU.
 
