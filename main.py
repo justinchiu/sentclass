@@ -188,7 +188,6 @@ elif args.model == "crfneg":
         rnn_sz  = args.rnn_sz,
         nlayers = args.nlayers,
         dp      = args.dp,
-        tieweights = args.tieweights,
     )
 elif args.model == "crfsimple":
     model = CrfSimple(
