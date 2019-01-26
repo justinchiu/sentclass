@@ -1,3 +1,5 @@
+import math
+
 from .base import Sent
 from .. import sentihood as data
 
@@ -57,6 +59,15 @@ class CrfNeg(Sent):
             bidirectional = True,
             batch_first   = True,
         )
+        stride = 5
+        self.conv = nn.Conv1d(
+            in_channels = emb_sz,
+            out_channels = len(L) * len(A) * 2*rnn_sz,
+            kernel_size = stride,
+            padding= math.floor(stride / 2),
+            stride = 1,
+            bias = False,
+        )
         self.drop = nn.Dropout(dp)
 
         # Score each sentiment for each location and aspect
@@ -65,6 +76,8 @@ class CrfNeg(Sent):
         self.proj_s.data[:,:,self.S.stoi["none"]].mul_(2)
         self.proj_neg = nn.Parameter(torch.randn(len(L)*len(A), 2, 2*rnn_sz))
         self.psi_ys = nn.Parameter(torch.FloatTensor([0.1, 0.1, 0.1]))
+        self.phi_b = nn.Parameter(torch.FloatTensor([0.8, 0.2]))
+        #self.phi_b.requires_grad = False
         self.flip = nn.Parameter(
             torch.zeros(len(self.S), len(self.S))
         )
@@ -72,6 +85,22 @@ class CrfNeg(Sent):
         self.flip.data[0,0] = 1
         self.flip.data[1,2] = 1
         self.flip.data[2,1] = 1
+        self.fm1= nn.Parameter(
+            torch.FloatTensor([
+                1, 0, 0,
+                0, 1, 0,
+                0, 0, 0,
+            ]).view(3,3)
+        )
+        self.fm1.requires_grad = False
+        self.fm2 = nn.Parameter(
+            torch.FloatTensor([
+                1, 0, 0,
+                0, 0, 0,
+                0, 1, 0,
+            ]).view(3,3)
+        )
+        self.fm2.requires_grad = False
 
     def forward(self, x, lens, k, kx):
         words = x
@@ -91,27 +120,44 @@ class CrfNeg(Sent):
         x, (h, c) = self.rnn(p_emb, state)
         # h: L * D x N x H
         x = unpack(x, True)[0]
+        #import pdb; pdb.set_trace()
         proj_s = self.proj_s[y_idx.squeeze(-1)]
         phi_s = torch.einsum("nsh,nth->nts", [proj_s, emb])
         proj_neg = self.proj_neg[y_idx.squeeze(-1)]
         phi_neg = torch.einsum("nbh,nth->ntb", [proj_neg, x])
+        # CONV
+        c = (self.conv(emb.transpose(-1, -2))
+            .transpose(-1, -2)
+            .view(N,T,-1,2*self.rnn_sz))#[:,:,y_idx.squeeze(-1),:]
+        cy = c.gather(2, y_idx.view(N,1,1,1).expand(N,T,1,100)).squeeze(-2)
+        #phi_neg = torch.einsum("nbh,nth->ntb", [proj_neg, cy])
+        # /CONV
+        # add prior
+        phi_neg = phi_neg + self.phi_b.view(1, 1, 2)
 
         phi_y = torch.zeros(N, len(self.S)).to(self.lut.weight.device)
         psi_ybs0 = torch.diag(self.psi_ys)
         psi_ybs1 = psi_ybs0 @ self.flip
         psi_ybs = (torch.stack([psi_ybs0, psi_ybs1], 1)
+        #psi_ybs = (torch.stack([psi_ybs0 @ self.fm1, psi_ybs0 @ self.fm2], 1)
             .view(1, 1, len(self.S), 2, len(self.S))
             .repeat(N, T, 1, 1, 1))
         idxs = torch.arange(0, max(lens)).to(lens.device)
         # mask: N x R
         mask = (idxs.repeat(len(lens), 1) >= lens.unsqueeze(-1))
         phi_s.masked_fill_(mask.unsqueeze(-1), 0)
+        phi_neg.masked_fill_(mask.unsqueeze(-1), 0)
         psi_ybs.masked_fill_(mask.view(N, T, 1, 1, 1).expand_as(psi_ybs), 0)
-        Z, hy = ubersum("nts,ntb,ntybs,ny->n,ny", phi_s, phi_neg, psi_ybs, phi_y, batch_dims="t", modulo_total=True)
+        Z, hy = ubersum(
+            "nts,ntb,ntybs,ny->n,ny",
+            phi_s, phi_neg, psi_ybs, phi_y, batch_dims="t", modulo_total=True)
         if self.training:
             self._N += 1
-        if self._N > 1000 and self.training:
-            Zt, hx, hb = ubersum("nts,ntb,ntybs,ny->nt,nts,ntb", phi_s, phi_neg, psi_ybs, phi_y, batch_dims="t", modulo_total=True)
+        #if self._N > 1000 and self.training:
+        if self._N > 100 and self.training:
+            Zt, hx, hb = ubersum(
+                "nts,ntb,ntybs,ny->nt,nts,ntb",
+                phi_s, phi_neg, psi_ybs, phi_y, batch_dims="t", modulo_total=True)
             xp = (hx - Zt.unsqueeze(-1)).exp()
             bp = (hb - Zt.unsqueeze(-1)).exp()
             yp = (hy - Z.unsqueeze(-1)).exp()
