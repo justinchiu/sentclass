@@ -11,7 +11,6 @@ from sentclass.models.lstmfinal import LstmFinal
 from sentclass.models.crflstmdiag import CrfLstmDiag
 from sentclass.models.crfemblstm import CrfEmbLstm
 from sentclass.models.crflstmlstm import CrfLstmLstm
-from sentclass.models.crfneg import CrfNeg
 
 import json
 
@@ -59,7 +58,7 @@ def get_args():
     parser.add_argument(
         "--model",
         choices=[
-            "lstmfinal", "crflstmdiag", "crfemblstm", "crflstmlstm", "crfneg",
+            "lstmfinal", "crflstmdiag", "crfemblstm", "crflstmlstm",
         ],
         default="lstmfinal"
     )
@@ -177,30 +176,6 @@ elif args.model == "crflstmlstm":
         nlayers = args.nlayers,
         dp      = args.dp,
     )
-elif args.model == "crfneg":
-    assert(args.flat_data)
-    model = CrfNeg(
-        V       = TEXT.vocab,
-        L       = LOCATION.vocab if LOCATION is not None else None,
-        A       = ASPECT.vocab,
-        S       = SENTIMENT.vocab,
-        emb_sz  = args.emb_sz,
-        rnn_sz  = args.rnn_sz,
-        nlayers = args.nlayers,
-        dp      = args.dp,
-    )
-elif args.model == "crfsimple":
-    model = CrfSimple(
-        V       = TEXT.vocab,
-        L       = LOCATION.vocab,
-        A       = ASPECT.vocab,
-        S       = SENTIMENT.vocab,
-        emb_sz  = args.emb_sz,
-        rnn_sz  = args.rnn_sz,
-        nlayers = args.nlayers,
-        dp      = args.dp,
-    )
-
 model.to(device)
 print(model)
 
